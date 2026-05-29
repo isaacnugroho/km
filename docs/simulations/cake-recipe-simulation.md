@@ -340,11 +340,11 @@ The developer chooses `[1]`. The semantic facts representing the finalized recip
 
 ## 4. Summary of Design Mechanics Demonstrated
 
-| KM MCP Component | Culinary Domain Translation | System Action / Benefit |
-| :--- | :--- | :--- |
-| **Learning Ontology** | Baking Science & Laws of Chemistry (Egg white behavior, fat interactions, acidity controls) | Prevents the generator from outputting impossible/collapsing recipe designs (no hallucinations). |
-| **Case Ontology** | The specific "Lavender & Cocoa Chiffon" recipe project | Captures raw experimental variables, local kitchen humidity, exact ingredient batches. |
-| **SHACL Constraint Linter** | Structural shape validation check (Fat vs. Albumen Foam) | Automatically validates active graph states against structural shapes and halts execution on violations. |
-| **Exception Authority** | separation-of-streams emulsion and gentle folding technique | Allows local workarounds for physical constraints with mandatory developer signature, linked to specific target nodes and bypassed shapes. |
-| **Knowledge Promotion** | Promoting "Cream of Tartar stabilizes Linalool collapse" to global SHACL shapes | Captures local empirical discoveries and generalizes them into organizational shapes and rules. |
-| **Named Graphs / Git Integration** | Separating trial recipes according to current test branch | Guarantees experimental changes to ingredient proportions don't corrupt the main production menu. |
+| KM MCP Component                   | Culinary Domain Translation                                                                 | System Action / Benefit                                                                                                                    |
+| :--------------------------------- | :------------------------------------------------------------------------------------------ | :----------------------------------------------------------------------------------------------------------------------------------------- |
+| **Learning Ontology**              | Baking Science & Laws of Chemistry (Egg white behavior, fat interactions, acidity controls) | Prevents the generator from outputting impossible/collapsing recipe designs (no hallucinations).                                           |
+| **Case Ontology**                  | The specific "Lavender & Cocoa Chiffon" recipe project                                      | Captures raw experimental variables, local kitchen humidity, exact ingredient batches.                                                     |
+| **SHACL Constraint Linter**        | Structural shape validation check (Fat vs. Albumen Foam)                                    | Automatically validates active graph states against structural shapes and halts execution on violations.                                   |
+| **Exception Authority**            | separation-of-streams emulsion and gentle folding technique                                 | Allows local workarounds for physical constraints with mandatory developer signature, linked to specific target nodes and bypassed shapes. |
+| **Knowledge Promotion**            | Promoting "Cream of Tartar stabilizes Linalool collapse" to global SHACL shapes             | Captures local empirical discoveries and generalizes them into organizational shapes and rules.                                            |
+| **Named Graphs / Git Integration** | Separating trial recipes according to current test branch                                   | Guarantees experimental changes to ingredient proportions don't corrupt the main production menu.                                          |

@@ -312,8 +312,8 @@ Quad-Store Graph Registry:
 
 ## 4. Summary of Multi-Ontology Execution
 
-| Learning Ontology | Governance Objective | SHACL Shape Checked | Resolution / Exception Outcome |
-| :--- | :--- | :--- | :--- |
-| **Distributed Systems** | Network consistency, packet reliability, event order. | `dist:IdempotentMessageShape` | **Approved Exception**: Ephemeral absolute mouse coordinates bypass idempotency checks due to self-superseding state rules. |
-| **React Hook Conventions** | Client-side memory safety, socket leaks, performance. | `react:EffectCleanupShape` | **Automatic Resolution**: Code refactored by the agent to return a `ws.close()` callback inside `useEffect`. |
-| **React Hook Conventions** | (Discovered & Promoted) Throttling rules. | `react:HighFrequencyThrottleShape` | **Knowledge Promotion**: Promoted new throttling constraint structure to the global library. |
+| Learning Ontology          | Governance Objective                                  | SHACL Shape Checked                | Resolution / Exception Outcome                                                                                              |
+| :------------------------- | :---------------------------------------------------- | :--------------------------------- | :-------------------------------------------------------------------------------------------------------------------------- |
+| **Distributed Systems**    | Network consistency, packet reliability, event order. | `dist:IdempotentMessageShape`      | **Approved Exception**: Ephemeral absolute mouse coordinates bypass idempotency checks due to self-superseding state rules. |
+| **React Hook Conventions** | Client-side memory safety, socket leaks, performance. | `react:EffectCleanupShape`         | **Automatic Resolution**: Code refactored by the agent to return a `ws.close()` callback inside `useEffect`.                |
+| **React Hook Conventions** | (Discovered & Promoted) Throttling rules.             | `react:HighFrequencyThrottleShape` | **Knowledge Promotion**: Promoted new throttling constraint structure to the global library.                                |
