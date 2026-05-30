@@ -10,8 +10,11 @@ from km.application.services.case_ingest_service import CaseIngestService
 from km.application.services.case_store_service import CaseStoreService
 from km.application.services.exception_service import ExceptionService
 from km.application.services.lo_cache_service import LOCacheService
+from km.application.services.lo_export_service import LOExportService
 from km.application.services.lo_resource_service import LOResourceService
 from km.application.services.lo_source_store_service import LOSourceStoreService
+from km.application.services.merge_request_service import MergeRequestService
+from km.application.services.mr_review_doc_service import MRReviewDocService
 from km.application.services.query_service import QueryService
 from km.application.services.schema_service import SchemaService
 from km.application.services.status_service import StatusService, SystemStatus
@@ -41,6 +44,8 @@ class KMApplication:
     schemas: SchemaService
     lo_source_store: LOSourceStoreService
     lo_resources: LOResourceService
+    lo_export: LOExportService
+    merge_requests: MergeRequestService
 
     @classmethod
     def bootstrap(cls, workspace_root: Path | None = None) -> KMApplication:
@@ -66,6 +71,16 @@ class KMApplication:
         lo_source_store = LOSourceStoreService()
         lo_source_store.bootstrap_all(binding_data)
         lo_resources = LOResourceService(lo_cache, lo_source_store)
+        lo_export = LOExportService()
+        review_docs = MRReviewDocService(root)
+        merge_requests = MergeRequestService(
+            root,
+            binding_data,
+            lo_source_store,
+            lo_cache.entries,
+            lo_export,
+            review_docs,
+        )
 
         case_db = workspace.resolve_config_path(workspace.config.quad_store.storage_path)
         exports_root = workspace.resolve_config_path(workspace.config.case_exports.base_path)
@@ -97,6 +112,8 @@ class KMApplication:
             schemas=schemas,
             lo_source_store=lo_source_store,
             lo_resources=lo_resources,
+            lo_export=lo_export,
+            merge_requests=merge_requests,
         )
         logger.info("KM bootstrap complete")
         return app
@@ -107,6 +124,7 @@ class KMApplication:
             self.git_context,
             self.lo_cache.entries,
             self.exceptions,
+            self.merge_requests,
         )
 
     def shutdown(self) -> None:

@@ -11,12 +11,13 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HEXAGONAL_LO = REPO_ROOT / "usages" / "ontologies" / "hexagonal-architecture"
+LO_RUNTIME_IGNORE = shutil.ignore_patterns("lo_quads.db", ".km-source-sync-manifest.json")
 
 
 @pytest.fixture
 def lo_package(tmp_path: Path) -> Path:
     dest = tmp_path / "lo" / "hexagonal-architecture"
-    shutil.copytree(HEXAGONAL_LO, dest)
+    shutil.copytree(HEXAGONAL_LO, dest, ignore=LO_RUNTIME_IGNORE)
     return dest
 
 
@@ -66,6 +67,39 @@ def tmp_workspace_on_write(tmp_path: Path, lo_package: Path) -> Path:
         ],
         "lo_cache": {"base_path": "./.km/lo-cache"},
         "case_exports": {"base_path": "./case-exports", "export_policy": "on_write"},
+        "branch_merge": {"policy": "auto_merge_exception"},
+    }
+    (km_dir / "config.json").write_text(json.dumps(config, indent=2), encoding="utf-8")
+    (ws / "case-exports" / "graphs").mkdir(parents=True)
+    (ws / "case-exports" / "governance").mkdir(parents=True)
+    return ws
+
+
+@pytest.fixture
+def curator_lo_package(tmp_path: Path) -> Path:
+    dest = tmp_path / "lo-curator" / "hexagonal-architecture"
+    shutil.copytree(HEXAGONAL_LO, dest, ignore=LO_RUNTIME_IGNORE)
+    return dest
+
+
+@pytest.fixture
+def tmp_curator_workspace(tmp_path: Path, curator_lo_package: Path) -> Path:
+    ws = tmp_path / "curator_workspace"
+    ws.mkdir()
+    subprocess.run(["git", "init", "-b", "main"], cwd=ws, check=True, capture_output=True)
+    km_dir = ws / ".km"
+    km_dir.mkdir()
+    config = {
+        "workspace_id": "test-curator-workspace",
+        "learning_ontologies": [
+            {
+                "ontology_id": "hexagonal-architecture",
+                "source": str(curator_lo_package),
+                "mode": "curator",
+            }
+        ],
+        "lo_cache": {"base_path": "./.km/lo-cache"},
+        "case_exports": {"base_path": "./case-exports", "export_policy": "on_commit"},
         "branch_merge": {"policy": "auto_merge_exception"},
     }
     (km_dir / "config.json").write_text(json.dumps(config, indent=2), encoding="utf-8")

@@ -21,6 +21,17 @@ def _ontology_id_from_uri(uri: str, suffix: str) -> str:
     return ontology_id
 
 
+def _mr_ids_from_uri(uri: str) -> tuple[str, str]:
+    prefix = "km://mr/"
+    if not uri.startswith(prefix):
+        raise ValueError(f"Invalid MR resource URI: {uri}")
+    remainder = uri.removeprefix(prefix)
+    parts = remainder.split("/", 1)
+    if len(parts) != 2 or not parts[0] or not parts[1]:
+        raise ValueError(f"Invalid MR resource URI: {uri}")
+    return parts[0], parts[1]
+
+
 def read_resource(app: KMApplication, uri: str) -> tuple[str, str]:
     """Return (content, mime_type) for a km:// resource URI."""
     logger.debug("Resource read: %s", uri)
@@ -59,6 +70,8 @@ def read_resource(app: KMApplication, uri: str) -> tuple[str, str]:
 
     if uri.startswith("km://mr/"):
         require_implemented("resource:mr")
-        return "", "text/markdown"
+        ontology_id, mr_id = _mr_ids_from_uri(uri)
+        content = app.merge_requests.read_review_doc(ontology_id, mr_id)
+        return content, "text/markdown"
 
     raise ValueError(f"Unknown resource URI: {uri}")

@@ -12,9 +12,7 @@ from km.exceptions import FeatureNotImplementedError
 @pytest.mark.parametrize(
     "feature",
     [
-        "propose_semantic_mr",
         "approve_semantic_mr",
-        "resource:mr",
         "cli:export-case",
     ],
 )
@@ -44,6 +42,11 @@ def test_phase3_features_implemented() -> None:
 def test_phase4a_lo_resources_implemented() -> None:
     require_implemented("resource:lo/canonical")
     require_implemented("resource:lo/governance")
+
+
+def test_phase4b_mr_propose_implemented() -> None:
+    require_implemented("propose_semantic_mr")
+    require_implemented("resource:mr")
 
 
 def test_release_enables_feature() -> None:

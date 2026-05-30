@@ -63,7 +63,9 @@ def handle_propose_semantic_mr(
     diff_deletions: str = "",
 ) -> dict[str, Any]:
     require_implemented("propose_semantic_mr")
-    return {"mr_id": "", "status": "PENDING_APPROVAL"}
+    return app.merge_requests.propose(
+        target_ontology, rationale, diff_insertions, diff_deletions
+    )
 
 
 def handle_approve_semantic_mr(app: KMApplication, doc_identifier: str) -> dict[str, Any]:

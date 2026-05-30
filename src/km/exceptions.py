@@ -19,3 +19,7 @@ class FeatureNotImplementedError(KmError):
     def __init__(self, feature: str) -> None:
         self.feature = feature
         super().__init__(f"feature not yet implemented: {feature}")
+
+
+class PermissionError(KmError):
+    """Raised when an operation requires curator mode on the target binding."""

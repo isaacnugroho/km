@@ -12,6 +12,7 @@ from km.logging_config import get_logger
 
 if TYPE_CHECKING:
     from km.application.services.exception_service import ExceptionService
+    from km.application.services.merge_request_service import MergeRequestService
 
 logger = get_logger("status")
 
@@ -41,6 +42,7 @@ class StatusService:
         git_context: GitContext,
         cache_entries: list[LOCacheEntry],
         exception_service: ExceptionService | None = None,
+        merge_request_service: MergeRequestService | None = None,
     ) -> SystemStatus:
         lo_status: list[dict[str, Any]] = []
         for entry in cache_entries:
@@ -58,17 +60,22 @@ class StatusService:
         if exception_service is not None:
             pending_exceptions = exception_service.count_pending(git_context)
 
+        pending_mrs = 0
+        if merge_request_service is not None:
+            pending_mrs = merge_request_service.count_pending()
+
         status = SystemStatus(
             active_branch=git_context.branch_path,
             learning_ontologies=lo_status,
             pending_exceptions_count=pending_exceptions,
-            pending_mrs_count=0,
+            pending_mrs_count=pending_mrs,
             branch_merge_policy=config.branch_merge.policy.value,
         )
         logger.info(
-            "System status: branch=%s, ontologies=%d, pending_exceptions=%d",
+            "System status: branch=%s, ontologies=%d, pending_exceptions=%d, pending_mrs=%d",
             status.active_branch,
             len(lo_status),
             pending_exceptions,
+            pending_mrs,
         )
         return status

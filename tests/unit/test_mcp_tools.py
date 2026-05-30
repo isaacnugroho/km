@@ -42,10 +42,12 @@ def test_handle_validate_constraints(tmp_workspace: Path) -> None:
         app.shutdown()
 
 
-def test_handle_propose_mr_stub(tmp_workspace: Path) -> None:
+def test_handle_propose_mr_read_only_rejected(tmp_workspace: Path) -> None:
     app = KMApplication.bootstrap(tmp_workspace)
     try:
-        with pytest.raises(FeatureNotImplementedError, match="propose_semantic_mr"):
-            mcp_tools.handle_propose_semantic_mr(app, "x", "r", "t")
+        from km.exceptions import PermissionError
+
+        with pytest.raises(PermissionError):
+            mcp_tools.handle_propose_semantic_mr(app, "hexagonal-architecture", "r", "t")
     finally:
         app.shutdown()

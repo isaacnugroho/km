@@ -8,23 +8,7 @@ import pytest
 
 from km.adapters.mcp import resources as resource_handlers
 from km.application.bootstrap import KMApplication
-from km.exceptions import FeatureNotImplementedError
 from tests.fixtures_data import SAMPLE_CASE_TURTLE
-
-
-@pytest.mark.parametrize(
-    "uri",
-    [
-        "km://mr/hexagonal-architecture/MR-001",
-    ],
-)
-def test_resource_stubs_raise(tmp_workspace: Path, uri: str) -> None:
-    app = KMApplication.bootstrap(tmp_workspace)
-    try:
-        with pytest.raises(FeatureNotImplementedError):
-            resource_handlers.read_resource(app, uri)
-    finally:
-        app.shutdown()
 
 
 def test_schemas_resource_implemented(tmp_workspace: Path) -> None:

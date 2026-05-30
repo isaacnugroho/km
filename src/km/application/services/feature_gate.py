@@ -12,14 +12,14 @@ FEATURES: dict[str, bool] = {
     "propose_local_exception": True,
     "approve_local_exception": True,
     "query_semantic_graph": True,
-    "propose_semantic_mr": False,
+    "propose_semantic_mr": True,
     "approve_semantic_mr": False,
     "resource:schemas/learning-ontologies": True,
     "resource:case/active-graph": True,
     "resource:case/active-exceptions": True,
     "resource:lo/canonical": True,
     "resource:lo/governance": True,
-    "resource:mr": False,
+    "resource:mr": True,
     "cli:export-case": False,
 }
 
