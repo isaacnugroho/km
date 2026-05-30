@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import json
+from collections.abc import Iterable
+
 from pyoxigraph import BlankNode, Literal, NamedNode, Quad
 from rdflib import BNode, Graph, Literal as RDFLiteral, URIRef
-from rdflib.namespace import RDF
+from rdflib.plugins.parsers.jsonld import to_rdf
 
 from km.logging_config import get_logger
 
@@ -23,22 +26,34 @@ def parse_facts(facts: str, fmt: str, graph_uri: str) -> list[Quad]:
     if not facts or not facts.strip():
         raise ValueError("Empty facts payload")
 
-    rdflib_format = "json-ld" if normalized == "json-ld" else "turtle"
-    graph = Graph()
-    graph.parse(data=facts, format=rdflib_format)
+    if normalized == "json-ld":
+        triples = _parse_json_ld(facts)
+    else:
+        graph = Graph()
+        graph.parse(data=facts, format="turtle")
+        triples = graph
 
+    return _triples_to_quads(triples, graph_uri)
+
+
+def _parse_json_ld(facts: str) -> Graph:
+    """Parse JSON-LD into an rdflib Graph without deprecated parser paths."""
+    graph = Graph()
+    to_rdf(json.loads(facts), graph)
+    return graph
+
+
+def _triples_to_quads(triples: Iterable[tuple[object, object, object]], graph_uri: str) -> list[Quad]:
     graph_node = NamedNode(graph_uri)
-    quads: list[Quad] = []
-    for subject, predicate, obj in graph:
-        quads.append(
-            Quad(
-                _to_oxi_term(subject),
-                _to_oxi_term(predicate),
-                _to_oxi_term(obj),
-                graph_node,
-            )
+    return [
+        Quad(
+            _to_oxi_term(subject),
+            _to_oxi_term(predicate),
+            _to_oxi_term(obj),
+            graph_node,
         )
-    return quads
+        for subject, predicate, obj in triples
+    ]
 
 
 def _to_oxi_term(term: object) -> NamedNode | BlankNode | Literal:
