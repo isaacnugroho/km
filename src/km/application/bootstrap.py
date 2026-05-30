@@ -73,14 +73,6 @@ class KMApplication:
         lo_resources = LOResourceService(lo_cache, lo_source_store)
         lo_export = LOExportService()
         review_docs = MRReviewDocService(root)
-        merge_requests = MergeRequestService(
-            root,
-            binding_data,
-            lo_source_store,
-            lo_cache.entries,
-            lo_export,
-            review_docs,
-        )
 
         case_db = workspace.resolve_config_path(workspace.config.quad_store.storage_path)
         exports_root = workspace.resolve_config_path(workspace.config.case_exports.base_path)
@@ -91,6 +83,16 @@ class KMApplication:
 
         case_export = CaseExportService(exports_root, case_wrapper)
         validation = ValidationService(case_wrapper, shacl_cache)
+        merge_requests = MergeRequestService(
+            root,
+            binding_data,
+            lo_source_store,
+            lo_cache,
+            lo_cache.entries,
+            lo_export,
+            review_docs,
+            validation,
+        )
         case_ingest = CaseIngestService(case_wrapper, case_export, workspace.config, validation)
         query = QueryService(case_wrapper, lo_cache.entries, git_context)
         exceptions = ExceptionService(case_wrapper, case_export, validation)

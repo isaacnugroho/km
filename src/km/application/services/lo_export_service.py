@@ -7,7 +7,7 @@ from pathlib import Path
 from pyoxigraph import NamedNode
 
 from km.application.services.lo_source_store_service import LOSourceStoreEntry
-from km.infrastructure.rdf.serialization import serialize_graph_block
+from km.infrastructure.rdf.serialization import serialize_canonical_export, serialize_graph_block
 from km.infrastructure.rdf.store import compute_export_checksums, write_sync_manifest
 from km.logging_config import get_logger
 
@@ -36,6 +36,15 @@ class LOExportService:
         )
         self.refresh_source_manifest(entry)
         logger.info("Upserted governance export %s", export_path)
+        return export_path
+
+    def regenerate_main_ttl(self, entry: LOSourceStoreEntry) -> Path:
+        canonical_uri = entry.lo_config.named_graphs.canonical
+        quads = entry.wrapper.quads_in_graph(canonical_uri)
+        export_path = entry.source_path / "exports" / "main.ttl"
+        export_path.write_text(serialize_canonical_export(quads), encoding="utf-8")
+        self.refresh_source_manifest(entry)
+        logger.info("Regenerated canonical export %s", export_path)
         return export_path
 
     def refresh_source_manifest(self, entry: LOSourceStoreEntry) -> None:

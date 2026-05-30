@@ -70,7 +70,9 @@ def handle_propose_semantic_mr(
 
 def handle_approve_semantic_mr(app: KMApplication, doc_identifier: str) -> dict[str, Any]:
     require_implemented("approve_semantic_mr")
-    return {"status": "APPROVED", "mr_id": "", "target_ontology": "", "timestamp": ""}
+    result = app.merge_requests.approve(doc_identifier)
+    app.shacl_cache = app.validation.shacl_cache
+    return result
 
 
 def tool_error_payload(exc: Exception) -> str:

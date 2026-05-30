@@ -9,25 +9,31 @@ from typing import Any
 
 from pyoxigraph import Literal, NamedNode, Quad
 
-from km.application.services.lo_cache_service import LOCacheEntry
+from km.application.services.lo_cache_service import LOCacheEntry, LOCacheService
 from km.application.services.lo_export_service import LOExportService
 from km.application.services.lo_source_store_service import LOSourceStoreEntry, LOSourceStoreService
 from km.application.services.mr_review_doc_service import MRReviewDocService
+from km.application.services.validation_service import ValidationService
 from km.domain.governance import (
     KM,
+    KM_APPROVED_AT,
+    KM_APPROVER,
     KM_AUTHOR,
     KM_CREATED_AT,
+    KM_DIFF_DELETIONS,
     KM_PROPOSAL_GRAPH,
     KM_RATIONALE,
     KM_REVIEW_DOC,
     KM_SEMANTIC_MERGE_REQUEST,
     KM_STATUS,
     KM_TARGET_ONTOLOGY,
+    STATUS_APPROVED,
     STATUS_PENDING,
 )
 from km.exceptions import KmError, PermissionError
 from km.infrastructure.config.models import LOBinding, LOPackageConfig, AccessMode
 from km.infrastructure.rdf.parse import parse_facts
+from km.infrastructure.rdf.shacl_cache import ShaclCache
 from km.logging_config import get_logger
 
 logger = get_logger("merge_request")
@@ -60,22 +66,54 @@ def proposal_graph_uri(ontology_id: str, mr_id: str) -> str:
     return f"http://km.local/learning-ontologies/{ontology_id}/mr/{mr_id}"
 
 
+def resolve_doc_identifier(
+    doc_identifier: str,
+    workspace_root: Path,
+    binding_data: list[tuple[LOBinding, LOPackageConfig, Path]],
+) -> tuple[str, str]:
+    raw = doc_identifier.strip()
+    if raw.startswith("km://mr/"):
+        remainder = raw.removeprefix("km://mr/")
+        parts = remainder.split("/", 1)
+        if len(parts) != 2 or not parts[0] or not parts[1]:
+            raise KmError(f"Invalid MR URI: {doc_identifier}")
+        return parts[0], parts[1]
+
+    path = Path(raw)
+    if not path.is_absolute():
+        path = (workspace_root / path).resolve()
+    stem = path.stem
+    if not stem.startswith("mr-"):
+        raise KmError(f"Cannot parse MR review document: {doc_identifier}")
+
+    remainder = stem.removeprefix("mr-")
+    for binding, _, _ in binding_data:
+        prefix = f"{binding.ontology_id}-"
+        if remainder.startswith(prefix):
+            return binding.ontology_id, f"MR-{remainder[len(prefix):]}"
+    raise KmError(f"Cannot parse MR review document: {doc_identifier}")
+
+
 class MergeRequestService:
     def __init__(
         self,
         workspace_root: Path,
         binding_data: list[tuple[LOBinding, LOPackageConfig, Path]],
         lo_source_store: LOSourceStoreService,
+        lo_cache: LOCacheService,
         lo_cache_entries: list[LOCacheEntry],
         lo_export: LOExportService,
         review_docs: MRReviewDocService,
+        validation: ValidationService,
     ) -> None:
         self.workspace_root = workspace_root
         self.binding_data = binding_data
         self.lo_source_store = lo_source_store
+        self.lo_cache = lo_cache
         self.lo_cache_entries = lo_cache_entries
         self.lo_export = lo_export
         self.review_docs = review_docs
+        self.validation = validation
 
     def propose(
         self,
@@ -84,7 +122,7 @@ class MergeRequestService:
         diff_insertions: str,
         diff_deletions: str = "",
     ) -> dict[str, Any]:
-        binding, lo_config, source_path = resolve_lo_binding(target_ontology, self.binding_data)
+        binding, lo_config, _source_path = resolve_lo_binding(target_ontology, self.binding_data)
         if binding.mode != AccessMode.CURATOR:
             raise PermissionError(
                 f"propose_semantic_mr requires curator mode on binding '{binding.ontology_id}'"
@@ -97,9 +135,7 @@ class MergeRequestService:
         author = os.environ.get("KM_MR_AUTHOR", "km-agent")
 
         insertion_quads = self._parse_diff(diff_insertions, proposal_uri, "insertions")
-        deletion_quads = self._parse_diff(diff_deletions, proposal_uri, "deletions") if diff_deletions.strip() else []
-
-        for quad in insertion_quads + deletion_quads:
+        for quad in insertion_quads:
             entry.wrapper.store.add(quad)
 
         gov_graph = NamedNode(lo_config.named_graphs.governance)
@@ -131,6 +167,15 @@ class MergeRequestService:
             ),
             Quad(mr_subject, NamedNode(KM_REVIEW_DOC), Literal(rel_review_doc), gov_graph),
         ]
+        if diff_deletions.strip():
+            governance_quads.append(
+                Quad(
+                    mr_subject,
+                    NamedNode(KM_DIFF_DELETIONS),
+                    Literal(diff_deletions),
+                    gov_graph,
+                )
+            )
         for quad in governance_quads:
             entry.wrapper.store.add(quad)
 
@@ -155,6 +200,65 @@ class MergeRequestService:
         )
         return {"mr_id": mr_id, "status": STATUS_PENDING}
 
+    def approve(self, doc_identifier: str) -> dict[str, Any]:
+        ontology_id, mr_id = resolve_doc_identifier(
+            doc_identifier, self.workspace_root, self.binding_data
+        )
+        binding, lo_config, source_path = self._binding_for_ontology(ontology_id)
+        if binding.mode != AccessMode.CURATOR:
+            raise PermissionError(
+                f"approve_semantic_mr requires curator mode on binding '{binding.ontology_id}'"
+            )
+
+        entry = self.lo_source_store.get_entry(ontology_id)
+        mr_subject = NamedNode(f"{KM}{mr_id}")
+        gov_graph = NamedNode(lo_config.named_graphs.governance)
+        record = self._load_mr_record(entry, mr_subject, gov_graph)
+        if record["status"] != STATUS_PENDING:
+            raise KmError(
+                f"MR {mr_id} is not PENDING_APPROVAL (status={record['status']})"
+            )
+
+        proposal_uri = record["proposal_graph"]
+        canonical = NamedNode(lo_config.named_graphs.canonical)
+        self._merge_proposal_into_canonical(entry, proposal_uri, canonical)
+        self._apply_deletions(entry, mr_subject, gov_graph, proposal_uri, canonical)
+
+        timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        approver = os.environ.get("KM_MR_APPROVER", "developer")
+        entry.wrapper.store.remove(
+            Quad(mr_subject, NamedNode(KM_STATUS), Literal(STATUS_PENDING), gov_graph)
+        )
+        entry.wrapper.store.add(
+            Quad(mr_subject, NamedNode(KM_STATUS), Literal(STATUS_APPROVED), gov_graph)
+        )
+        entry.wrapper.store.add(
+            Quad(mr_subject, NamedNode(KM_APPROVER), Literal(approver), gov_graph)
+        )
+        entry.wrapper.store.add(
+            Quad(
+                mr_subject,
+                NamedNode(KM_APPROVED_AT),
+                Literal(timestamp, datatype=NamedNode(XSD_DATE_TIME)),
+                gov_graph,
+            )
+        )
+
+        self.lo_export.regenerate_main_ttl(entry)
+        self.lo_export.upsert_governance_mr_shard(entry, mr_id, mr_subject)
+        cache_entry = self.lo_cache.resync_binding(binding, lo_config, source_path)
+        self._replace_cache_entry(cache_entry)
+        shacl_cache = ShaclCache.compile_from_lo_entries(self.lo_cache.entries)
+        self.validation.reload_shapes(shacl_cache)
+
+        logger.info("Approved semantic MR %s for %s", mr_id, ontology_id)
+        return {
+            "status": STATUS_APPROVED,
+            "mr_id": mr_id,
+            "target_ontology": lo_config.base_uri,
+            "timestamp": timestamp,
+        }
+
     def read_review_doc(self, ontology_id: str, mr_id: str) -> str:
         return self.review_docs.read_review_doc(ontology_id, mr_id)
 
@@ -172,6 +276,84 @@ class MergeRequestService:
             """
             total += len(entry.wrapper.query(query))
         return total
+
+    def _binding_for_ontology(self, ontology_id: str) -> tuple[LOBinding, LOPackageConfig, Path]:
+        for binding, lo_config, source_path in self.binding_data:
+            if binding.ontology_id == ontology_id:
+                return binding, lo_config, source_path
+        raise KmError(f"Unknown learning ontology: {ontology_id}")
+
+    def _replace_cache_entry(self, cache_entry: LOCacheEntry) -> None:
+        for index, entry in enumerate(self.lo_cache_entries):
+            if entry.binding.ontology_id == cache_entry.binding.ontology_id:
+                self.lo_cache_entries[index] = cache_entry
+                return
+        self.lo_cache_entries.append(cache_entry)
+
+    def _load_mr_record(
+        self,
+        entry: LOSourceStoreEntry,
+        mr_subject: NamedNode,
+        gov_graph: NamedNode,
+    ) -> dict[str, str]:
+        query = f"""
+            SELECT ?status ?proposal WHERE {{
+                GRAPH <{gov_graph.value}> {{
+                    <{mr_subject.value}> a <{KM_SEMANTIC_MERGE_REQUEST}> ;
+                        <{KM_STATUS}> ?status ;
+                        <{KM_PROPOSAL_GRAPH}> ?proposal .
+                }}
+            }}
+        """
+        rows = entry.wrapper.query(query)
+        if not rows:
+            raise KmError(f"Semantic merge request not found: {mr_subject.value}")
+        row = rows[0]
+        status = row.get("status")
+        proposal = row.get("proposal")
+        if not status or not proposal:
+            raise KmError(f"Incomplete MR record for {mr_subject.value}")
+        return {"status": status, "proposal_graph": proposal}
+
+    def _merge_proposal_into_canonical(
+        self,
+        entry: LOSourceStoreEntry,
+        proposal_uri: str,
+        canonical: NamedNode,
+    ) -> None:
+        for quad in entry.wrapper.quads_in_graph(proposal_uri):
+            entry.wrapper.store.add(
+                Quad(quad.subject, quad.predicate, quad.object, canonical)
+            )
+
+    def _apply_deletions(
+        self,
+        entry: LOSourceStoreEntry,
+        mr_subject: NamedNode,
+        gov_graph: NamedNode,
+        proposal_uri: str,
+        canonical: NamedNode,
+    ) -> None:
+        deletions = self._literal_object(entry, mr_subject, gov_graph, KM_DIFF_DELETIONS)
+        if not deletions:
+            return
+        for quad in self._parse_diff(deletions, proposal_uri, "deletions"):
+            canonical_quad = Quad(quad.subject, quad.predicate, quad.object, canonical)
+            entry.wrapper.remove_quad(canonical_quad)
+
+    def _literal_object(
+        self,
+        entry: LOSourceStoreEntry,
+        subject: NamedNode,
+        graph: NamedNode,
+        predicate_uri: str,
+    ) -> str | None:
+        for quad in entry.wrapper.store.quads_for_pattern(
+            subject, NamedNode(predicate_uri), None, graph
+        ):
+            if isinstance(quad.object, Literal):
+                return quad.object.value
+        return None
 
     def _mint_mr_id(self, entry: LOSourceStoreEntry) -> str:
         gov_graph = entry.lo_config.named_graphs.governance

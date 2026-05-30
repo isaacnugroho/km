@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from pyoxigraph import BlankNode, Literal, NamedNode, Quad
 
-from km.infrastructure.rdf.ref_mapping import branch_path_to_graph_uri
-
 
 def _term_key(term: object) -> tuple:
     if isinstance(term, NamedNode):
@@ -23,6 +21,21 @@ def _term_key(term: object) -> tuple:
 
 def sort_quads(quads: list[Quad]) -> list[Quad]:
     return sorted(quads, key=lambda q: (_term_key(q.subject), _term_key(q.predicate), _term_key(q.object)))
+
+
+def serialize_canonical_export(quads: list[Quad]) -> str:
+    """Serialize canonical quads as plain Turtle for exports/main.ttl."""
+    lines = [
+        "@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .",
+        "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .",
+        "@prefix owl:  <http://www.w3.org/2002/07/owl#> .",
+        "@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .",
+        "@prefix sh:   <http://www.w3.org/ns/shacl#> .",
+        "",
+    ]
+    for quad in sort_quads(quads):
+        lines.append(f"{_format_triple(quad)} .")
+    return "\n".join(lines) + "\n"
 
 
 def serialize_graph_block(graph_uri: str, quads: list[Quad]) -> str:
@@ -43,16 +56,16 @@ def _format_triple(quad: Quad) -> str:
 
 def _format_term(term: object) -> str:
     if isinstance(term, NamedNode):
-        return f"<{term}>"
+        return f"<{term.value}>"
     if isinstance(term, BlankNode):
-        return term.n3() if hasattr(term, "n3") else f"_:{term}"
+        return f"_:{term.value}"
     if isinstance(term, Literal):
         if term.language:
             escaped = _escape_literal(term.value)
             return f'"{escaped}"@{term.language}'
         if term.datatype:
             escaped = _escape_literal(term.value)
-            return f'"{escaped}"^^<{term.datatype}>'
+            return f'"{escaped}"^^<{term.datatype.value}>'
         escaped = _escape_literal(term.value)
         return f'"{escaped}"'
     return str(term)

@@ -100,3 +100,13 @@ class LOCacheService:
         for binding, lo_config, source_path in bindings:
             self.sync_binding(binding, lo_config, source_path)
         return self.entries
+
+    def resync_binding(
+        self,
+        binding: LOBinding,
+        lo_config: LOPackageConfig,
+        source_path: Path,
+    ) -> LOCacheEntry:
+        """Replace cache entry after source exports change (e.g. MR approve)."""
+        self.entries = [e for e in self.entries if e.binding.ontology_id != binding.ontology_id]
+        return self.sync_binding(binding, lo_config, source_path)

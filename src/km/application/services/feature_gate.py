@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from km.exceptions import FeatureNotImplementedError
 
-# Phase 4a: LO canonical/governance resources and source store reads enabled.
+# Phase 4c: approve_semantic_mr with canonical merge and LO cache/SHACL refresh enabled.
 FEATURES: dict[str, bool] = {
     "get_system_status": True,
     "ingest_case_facts": True,
@@ -13,7 +13,7 @@ FEATURES: dict[str, bool] = {
     "approve_local_exception": True,
     "query_semantic_graph": True,
     "propose_semantic_mr": True,
-    "approve_semantic_mr": False,
+    "approve_semantic_mr": True,
     "resource:schemas/learning-ontologies": True,
     "resource:case/active-graph": True,
     "resource:case/active-exceptions": True,

@@ -203,6 +203,12 @@ class QuadStoreWrapper:
                 added += 1
         return added
 
+    def remove_quad(self, quad: Quad) -> bool:
+        if not self.has_quad(quad):
+            return False
+        self.store.remove(quad)
+        return True
+
     def serialize_graph(self, graph_uri: str) -> str:
         quads = self.quads_in_graph(graph_uri)
         if not quads:

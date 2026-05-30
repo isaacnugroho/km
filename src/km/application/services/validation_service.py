@@ -41,6 +41,11 @@ class ValidationService:
         self._cache.pop(graph_uri, None)
         logger.debug("Validation cache invalidated for %s", graph_uri)
 
+    def reload_shapes(self, shacl_cache: ShaclCache) -> None:
+        self.shacl_cache = shacl_cache
+        self._cache.clear()
+        logger.info("Reloaded SHACL shapes; validation cache cleared")
+
     def validate_constraints(self, git_context: GitContext) -> dict[str, Any]:
         graph_uri = git_context.graph_uri
         store = self.case_wrapper.store
