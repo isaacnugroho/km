@@ -10,3 +10,4 @@ build/
 .coverage
 htmlcov/
 .cursor/
+usages/**/lo_quads.db
