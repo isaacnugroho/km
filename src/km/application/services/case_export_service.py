@@ -91,3 +91,7 @@ class CaseExportService:
         write_case_sync_manifest(self.exports_root, checksums)
         logger.info("Exported case graph to %s", export_path)
         return export_path
+
+    def export_active(self, git_context: GitContext) -> Path:
+        """Export the active branch graph and refresh the case export manifest."""
+        return self.export_branch(git_context)

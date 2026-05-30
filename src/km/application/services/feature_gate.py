@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from km.exceptions import FeatureNotImplementedError
 
-# Phase 4c: approve_semantic_mr with canonical merge and LO cache/SHACL refresh enabled.
+# Phase 5: export-case CLI, git watcher, branch inheritance, merge resolver enabled.
 FEATURES: dict[str, bool] = {
     "get_system_status": True,
     "ingest_case_facts": True,
@@ -20,7 +20,7 @@ FEATURES: dict[str, bool] = {
     "resource:lo/canonical": True,
     "resource:lo/governance": True,
     "resource:mr": True,
-    "cli:export-case": False,
+    "cli:export-case": True,
 }
 
 

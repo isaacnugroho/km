@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -12,6 +13,24 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HEXAGONAL_LO = REPO_ROOT / "usages" / "ontologies" / "hexagonal-architecture"
 LO_RUNTIME_IGNORE = shutil.ignore_patterns("lo_quads.db", ".km-source-sync-manifest.json")
+_GIT_ENV = {
+    **os.environ,
+    "GIT_AUTHOR_NAME": "km-test",
+    "GIT_AUTHOR_EMAIL": "km-test@example.com",
+    "GIT_COMMITTER_NAME": "km-test",
+    "GIT_COMMITTER_EMAIL": "km-test@example.com",
+}
+
+
+def _init_git_repo(path: Path, *, branch: str = "main") -> None:
+    subprocess.run(["git", "init", "-b", branch], cwd=path, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "--allow-empty", "-m", "km test init"],
+        cwd=path,
+        check=True,
+        capture_output=True,
+        env=_GIT_ENV,
+    )
 
 
 @pytest.fixture
@@ -25,7 +44,7 @@ def lo_package(tmp_path: Path) -> Path:
 def tmp_workspace(tmp_path: Path, lo_package: Path) -> Path:
     ws = tmp_path / "workspace"
     ws.mkdir()
-    subprocess.run(["git", "init", "-b", "main"], cwd=ws, check=True, capture_output=True)
+    _init_git_repo(ws)
     km_dir = ws / ".km"
     km_dir.mkdir()
     rel_lo = Path("..") / "lo" / "hexagonal-architecture"
@@ -53,7 +72,7 @@ def tmp_workspace(tmp_path: Path, lo_package: Path) -> Path:
 def tmp_workspace_on_write(tmp_path: Path, lo_package: Path) -> Path:
     ws = tmp_path / "workspace_on_write"
     ws.mkdir()
-    subprocess.run(["git", "init", "-b", "main"], cwd=ws, check=True, capture_output=True)
+    _init_git_repo(ws)
     km_dir = ws / ".km"
     km_dir.mkdir()
     config = {
@@ -86,7 +105,7 @@ def curator_lo_package(tmp_path: Path) -> Path:
 def tmp_curator_workspace(tmp_path: Path, curator_lo_package: Path) -> Path:
     ws = tmp_path / "curator_workspace"
     ws.mkdir()
-    subprocess.run(["git", "init", "-b", "main"], cwd=ws, check=True, capture_output=True)
+    _init_git_repo(ws)
     km_dir = ws / ".km"
     km_dir.mkdir()
     config = {

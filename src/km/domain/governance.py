@@ -20,6 +20,17 @@ KM_DIFF_DELETIONS = f"{KM}diffDeletions"
 KM_APPROVER = f"{KM}approver"
 KM_APPROVED_AT = f"{KM}approvedAt"
 
+KM_BRANCH_MERGE_RESOLUTION = f"{KM}BranchMergeResolution"
+KM_SOURCE_GRAPH = f"{KM}sourceGraph"
+KM_TARGET_GRAPH = f"{KM}targetGraph"
+KM_RESOLUTION = f"{KM}resolution"
+KM_POLICY = f"{KM}policy"
+KM_EXCEPTIONS_COPIED = f"{KM}exceptionsCopied"
+KM_TRIPLES_IMPORTED = f"{KM}triplesImported"
+KM_RECORDED_AT = f"{KM}recordedAt"
+
+CASE_GOVERNANCE_GRAPH = "http://km.local/case/governance"
+
 STATUS_PENDING = "PENDING_APPROVAL"
 STATUS_APPROVED = "APPROVED"
 STATUS_REJECTED = "REJECTED"

@@ -17,7 +17,7 @@ mcp = FastMCP("km")
 
 def _get_app() -> KMApplication:
     if not hasattr(_get_app, "_app"):
-        _get_app._app = KMApplication.bootstrap()  # type: ignore[attr-defined]
+        _get_app._app = KMApplication.bootstrap(enable_git_watcher=True)  # type: ignore[attr-defined]
     return _get_app._app  # type: ignore[attr-defined]
 
 

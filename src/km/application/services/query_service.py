@@ -8,7 +8,7 @@ from typing import Any
 
 from km.application.services.lo_cache_service import LOCacheEntry
 from km.exceptions import KmError
-from km.infrastructure.git.context import GitContext
+from km.infrastructure.git.context import GitContextHolder
 from km.infrastructure.rdf.store import QuadStoreWrapper
 from km.logging_config import get_logger
 from rdflib import BNode, Graph, Literal as RDFLiteral, URIRef
@@ -28,11 +28,11 @@ class QueryService:
         self,
         case_wrapper: QuadStoreWrapper,
         lo_cache_entries: list[LOCacheEntry],
-        git_context: GitContext,
+        git: GitContextHolder,
     ) -> None:
         self.case_wrapper = case_wrapper
         self.lo_cache_entries = lo_cache_entries
-        self.git_context = git_context
+        self.git = git
 
     def query(self, sparql: str) -> dict[str, Any]:
         if not sparql or not sparql.strip():
@@ -69,7 +69,7 @@ class QueryService:
 
     def _build_dataset(self) -> Graph:
         merged = Graph()
-        case_quads = self.case_wrapper.quads_in_graph(self.git_context.graph_uri)
+        case_quads = self.case_wrapper.quads_in_graph(self.git.context.graph_uri)
         _add_quads_to_graph(merged, case_quads)
 
         for entry in self.lo_cache_entries:
@@ -81,7 +81,7 @@ class QueryService:
             finally:
                 lo_wrapper.close()
 
-        graph_uris = [self.git_context.graph_uri] + [
+        graph_uris = [self.git.context.graph_uri] + [
             e.lo_config.named_graphs.canonical for e in self.lo_cache_entries
         ]
         logger.debug("Query dataset graphs: %s", graph_uris)

@@ -1,4 +1,4 @@
-"""Git branch context (read-only, spec §5.1)."""
+"""Git branch context and mutable holder for branch watcher (spec §5.1)."""
 
 from __future__ import annotations
 
@@ -19,6 +19,21 @@ class GitContext:
     graph_uri: str
 
 
+@dataclass
+class GitContextHolder:
+    workspace_root: Path
+    context: GitContext
+
+    @classmethod
+    def create(cls, workspace_root: Path) -> GitContextHolder:
+        return cls(workspace_root=workspace_root, context=read_git_context(workspace_root))
+
+    def refresh(self) -> tuple[GitContext, GitContext]:
+        previous = self.context
+        self.context = read_git_context(self.workspace_root)
+        return previous, self.context
+
+
 def read_git_context(workspace_root: Path) -> GitContext:
     git_dir = workspace_root / ".git"
     head_path = git_dir / "HEAD"
@@ -32,7 +47,6 @@ def read_git_context(workspace_root: Path) -> GitContext:
         branch_path = _branch_path_from_ref(ref)
         return _context_from_branch(branch_path, active_ref=ref)
 
-    # Detached HEAD — use short sha as branch path segment
     short_sha = head_content[:7]
     logger.debug("Detached HEAD at %s", short_sha)
     return GitContext(

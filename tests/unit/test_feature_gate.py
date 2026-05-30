@@ -5,22 +5,13 @@ from __future__ import annotations
 import pytest
 
 from km.application.services import feature_gate
+from km.application.services import feature_gate
 from km.application.services.feature_gate import require_implemented
 from km.exceptions import FeatureNotImplementedError
 
 
-@pytest.mark.parametrize(
-    "feature",
-    [
-        "cli:export-case",
-    ],
-)
-def test_stub_features_raise(feature: str) -> None:
-    with pytest.raises(FeatureNotImplementedError, match=f"feature not yet implemented: {feature}"):
-        require_implemented(feature)
-
-
-def test_get_system_status_is_implemented() -> None:
+def test_all_features_enabled() -> None:
+    assert all(feature_gate.FEATURES.values())
     require_implemented("get_system_status")
 
 
@@ -50,6 +41,10 @@ def test_phase4b_mr_propose_implemented() -> None:
 
 def test_phase4c_mr_approve_implemented() -> None:
     require_implemented("approve_semantic_mr")
+
+
+def test_phase5_features_implemented() -> None:
+    require_implemented("cli:export-case")
 
 
 def test_release_enables_feature() -> None:
