@@ -10,9 +10,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from pyoxigraph import Literal, NamedNode, Quad, RdfFormat, Store
+from pyoxigraph import BlankNode, Literal, NamedNode, Quad, RdfFormat, Store
 
 from km.infrastructure.config.models import SyncManifest
+from km.infrastructure.rdf.serialization import serialize_graph_block
 from km.logging_config import get_logger
 
 logger = get_logger("rdf.store")
@@ -147,6 +148,45 @@ class QuadStoreWrapper:
             if hasattr(row, "items"):
                 results.append({k: _term_to_str(v) for k, v in row.items()})
         return results
+
+    def ask(self, sparql: str) -> bool:
+        result = self.store.query(sparql)
+        if isinstance(result, bool):
+            return result
+        return bool(result)
+
+    def quads_in_graph(self, graph_uri: str) -> list[Quad]:
+        graph = NamedNode(graph_uri)
+        return list(self.store.quads_for_pattern(None, None, None, graph))
+
+    def has_quad(self, quad: Quad) -> bool:
+        return bool(
+            list(
+                self.store.quads_for_pattern(
+                    quad.subject, quad.predicate, quad.object, quad.graph_name
+                )
+            )
+        )
+
+    def add_quad(self, quad: Quad) -> bool:
+        """Add quad if not present. Returns True if a new quad was added."""
+        if self.has_quad(quad):
+            return False
+        self.store.add(quad)
+        return True
+
+    def add_quads(self, quads: list[Quad]) -> int:
+        added = 0
+        for quad in quads:
+            if self.add_quad(quad):
+                added += 1
+        return added
+
+    def serialize_graph(self, graph_uri: str) -> str:
+        quads = self.quads_in_graph(graph_uri)
+        if not quads:
+            return f"GRAPH <{graph_uri}> {{\n}}\n"
+        return serialize_graph_block(graph_uri, quads)
 
     def close(self) -> None:
         del self.store

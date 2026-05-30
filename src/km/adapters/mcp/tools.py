@@ -20,9 +20,9 @@ def handle_get_system_status(app: KMApplication) -> dict[str, Any]:
 
 
 def handle_ingest_case_facts(app: KMApplication, facts: str, format: str = "json-ld") -> dict[str, Any]:
-    logger.debug("ingest_case_facts called format=%s", format)
     require_implemented("ingest_case_facts")
-    return {"status": "success", "triples_added": 0}
+    logger.debug("ingest_case_facts format=%s", format)
+    return app.case_ingest.ingest(facts, format, app.git_context)
 
 
 def handle_validate_constraints(app: KMApplication) -> dict[str, Any]:
@@ -52,7 +52,7 @@ def handle_approve_local_exception(
 
 def handle_query_semantic_graph(app: KMApplication, query: str) -> dict[str, Any]:
     require_implemented("query_semantic_graph")
-    return {"head": {"vars": []}, "results": {"bindings": []}}
+    return app.query.query(query)
 
 
 def handle_propose_semantic_mr(

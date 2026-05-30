@@ -5,8 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from km.application.services.case_export_service import CaseExportService
+from km.application.services.case_ingest_service import CaseIngestService
 from km.application.services.case_store_service import CaseStoreService
 from km.application.services.lo_cache_service import LOCacheService
+from km.application.services.query_service import QueryService
 from km.application.services.status_service import StatusService, SystemStatus
 from km.application.services.workspace_service import WorkspaceService, discover_workspace_root
 from km.infrastructure.git.context import GitContext, read_git_context
@@ -23,6 +26,9 @@ class KMApplication:
     case_store: CaseStoreService
     git_context: GitContext
     status_service: StatusService
+    case_export: CaseExportService
+    case_ingest: CaseIngestService
+    query: QueryService
 
     @classmethod
     def bootstrap(cls, workspace_root: Path | None = None) -> KMApplication:
@@ -47,9 +53,13 @@ class KMApplication:
         case_db = workspace.resolve_config_path(workspace.config.quad_store.storage_path)
         exports_root = workspace.resolve_config_path(workspace.config.case_exports.base_path)
         case_store = CaseStoreService(root, case_db, exports_root)
-        case_store.bootstrap()
+        case_wrapper = case_store.bootstrap()
 
         git_context = read_git_context(root)
+
+        case_export = CaseExportService(exports_root, case_wrapper)
+        case_ingest = CaseIngestService(case_wrapper, case_export, workspace.config)
+        query = QueryService(case_wrapper, lo_cache.entries, git_context)
 
         app = cls(
             workspace_root=root,
@@ -58,6 +68,9 @@ class KMApplication:
             case_store=case_store,
             git_context=git_context,
             status_service=StatusService(),
+            case_export=case_export,
+            case_ingest=case_ingest,
+            query=query,
         )
         logger.info("KM bootstrap complete")
         return app

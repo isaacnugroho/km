@@ -46,3 +46,29 @@ def tmp_workspace(tmp_path: Path, lo_package: Path) -> Path:
     (ws / "case-exports" / "graphs").mkdir(parents=True)
     (ws / "case-exports" / "governance").mkdir(parents=True)
     return ws
+
+
+@pytest.fixture
+def tmp_workspace_on_write(tmp_path: Path, lo_package: Path) -> Path:
+    ws = tmp_path / "workspace_on_write"
+    ws.mkdir()
+    subprocess.run(["git", "init", "-b", "main"], cwd=ws, check=True, capture_output=True)
+    km_dir = ws / ".km"
+    km_dir.mkdir()
+    config = {
+        "workspace_id": "test-workspace-on-write",
+        "learning_ontologies": [
+            {
+                "ontology_id": "hexagonal-architecture",
+                "source": str(lo_package),
+                "mode": "read_only",
+            }
+        ],
+        "lo_cache": {"base_path": "./.km/lo-cache"},
+        "case_exports": {"base_path": "./case-exports", "export_policy": "on_write"},
+        "branch_merge": {"policy": "auto_merge_exception"},
+    }
+    (km_dir / "config.json").write_text(json.dumps(config, indent=2), encoding="utf-8")
+    (ws / "case-exports" / "graphs").mkdir(parents=True)
+    (ws / "case-exports" / "governance").mkdir(parents=True)
+    return ws

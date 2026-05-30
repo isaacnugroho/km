@@ -6,11 +6,18 @@ See [docs/knowledge-management-specification.md](docs/knowledge-management-speci
 
 ## Phase 1 status
 
-Phase 1 delivers a **runnable MCP server** with the full tool/resource surface wired up. Only `get_system_status` and the startup pipeline are fully implemented; all other tools and resources return:
+Phase 1 delivered a runnable MCP server with logging, tests, and stub gates.
 
-```
-feature not yet implemented: <feature-name>
-```
+## Phase 2 status
+
+Phase 2 adds the case knowledge loop:
+
+- `ingest_case_facts` — parse JSON-LD/Turtle into the active branch graph
+- `query_semantic_graph` — read-only SELECT/ASK over case + LO canonical graphs
+- `km://case/active-graph` — Turtle serialization of the active branch graph
+- Case export pipeline with `on_write` policy (exports to `case-exports/graphs/`)
+
+Still stubbed: SHACL validation, exceptions, semantic MR, git watcher, `km export-case` CLI.
 
 ## Install
 
@@ -89,13 +96,15 @@ pytest
 | Tool | Phase 1 |
 |------|---------|
 | `get_system_status` | Implemented |
-| `ingest_case_facts` | Stub |
+| `ingest_case_facts` | Implemented |
 | `validate_constraints` | Stub |
 | `propose_local_exception` | Stub |
 | `approve_local_exception` | Stub |
-| `query_semantic_graph` | Stub |
+| `query_semantic_graph` | Implemented |
 | `propose_semantic_mr` | Stub |
 | `approve_semantic_mr` | Stub |
+
+Resource `km://case/active-graph` is also implemented (Phase 2).
 
 ## CLI commands
 

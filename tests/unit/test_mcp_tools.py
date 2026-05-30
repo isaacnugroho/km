@@ -9,6 +9,7 @@ import pytest
 from km.adapters.mcp import tools as mcp_tools
 from km.application.bootstrap import KMApplication
 from km.exceptions import FeatureNotImplementedError
+from tests.fixtures_data import SAMPLE_CASE_TURTLE
 
 
 def test_handle_get_system_status(tmp_workspace: Path) -> None:
@@ -21,10 +22,20 @@ def test_handle_get_system_status(tmp_workspace: Path) -> None:
         app.shutdown()
 
 
-def test_handle_ingest_stub(tmp_workspace: Path) -> None:
+def test_handle_ingest_success(tmp_workspace: Path) -> None:
     app = KMApplication.bootstrap(tmp_workspace)
     try:
-        with pytest.raises(FeatureNotImplementedError, match="ingest_case_facts"):
-            mcp_tools.handle_ingest_case_facts(app, "{}", "json-ld")
+        result = mcp_tools.handle_ingest_case_facts(app, SAMPLE_CASE_TURTLE, "turtle")
+        assert result["status"] == "success"
+        assert result["triples_added"] == 1
+    finally:
+        app.shutdown()
+
+
+def test_handle_validate_stub(tmp_workspace: Path) -> None:
+    app = KMApplication.bootstrap(tmp_workspace)
+    try:
+        with pytest.raises(FeatureNotImplementedError, match="validate_constraints"):
+            mcp_tools.handle_validate_constraints(app)
     finally:
         app.shutdown()

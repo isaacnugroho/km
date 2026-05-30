@@ -8,12 +8,6 @@ from km.logging_config import get_logger
 
 logger = get_logger("mcp.resources")
 
-RESOURCE_URIS = [
-    "km://schemas/learning-ontologies",
-    "km://case/active-graph",
-    "km://case/active-exceptions",
-]
-
 
 def read_resource(app: KMApplication, uri: str) -> tuple[str, str]:
     """Return (content, mime_type) for a km:// resource URI."""
@@ -25,7 +19,8 @@ def read_resource(app: KMApplication, uri: str) -> tuple[str, str]:
 
     if uri == "km://case/active-graph":
         require_implemented("resource:case/active-graph")
-        return "", "text/turtle"
+        content = app.case_ingest.serialize_active_graph(app.git_context)
+        return content, "text/turtle"
 
     if uri == "km://case/active-exceptions":
         require_implemented("resource:case/active-exceptions")
