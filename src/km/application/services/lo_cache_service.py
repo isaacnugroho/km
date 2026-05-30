@@ -1,0 +1,110 @@
+"""LO workspace cache synchronization (spec §2.3)."""
+
+from __future__ import annotations
+
+import time
+from dataclasses import dataclass
+from pathlib import Path
+
+from km.infrastructure.config.models import LOBinding, LOPackageConfig, SyncManifest
+from km.infrastructure.rdf.store import (
+    QuadStoreWrapper,
+    compute_export_checksums,
+    load_sync_manifest,
+    needs_cache_rebuild,
+    remove_store,
+    write_sync_manifest,
+)
+from km.logging_config import get_logger
+
+logger = get_logger("lo_cache")
+
+
+@dataclass
+class LOCacheEntry:
+    binding: LOBinding
+    source_path: Path
+    lo_config: LOPackageConfig
+    cache_dir: Path
+    cache_db: Path
+    manifest_path: Path
+    manifest: SyncManifest | None
+    rebuilt: bool
+
+
+class LOCacheService:
+    def __init__(self, workspace_root: Path, lo_cache_base: Path) -> None:
+        self.workspace_root = workspace_root
+        self.lo_cache_base = lo_cache_base
+        self.entries: list[LOCacheEntry] = []
+
+    def sync_binding(self, binding: LOBinding, lo_config: LOPackageConfig, source_path: Path) -> LOCacheEntry:
+        cache_dir = self.lo_cache_base / binding.ontology_id
+        cache_db = cache_dir / "lo_quads.db"
+        manifest_path = cache_dir / "sync-manifest.json"
+
+        current_checksums = compute_export_checksums(source_path)
+        rebuild = needs_cache_rebuild(cache_db, manifest_path, current_checksums)
+
+        if rebuild:
+            start = time.perf_counter()
+            logger.info("Rebuilding LO cache for %s", binding.ontology_id)
+            self._rebuild_cache(source_path, lo_config, cache_dir, cache_db)
+            elapsed_ms = (time.perf_counter() - start) * 1000
+            logger.debug(
+                "Cache rebuild for %s completed in %.1fms",
+                binding.ontology_id,
+                elapsed_ms,
+            )
+        else:
+            logger.info("LO cache up to date for %s", binding.ontology_id)
+
+        manifest = write_sync_manifest(
+            manifest_path,
+            ontology_id=binding.ontology_id,
+            source=str(source_path),
+            mode=binding.mode.value,
+            export_checksums=current_checksums,
+        )
+
+        entry = LOCacheEntry(
+            binding=binding,
+            source_path=source_path,
+            lo_config=lo_config,
+            cache_dir=cache_dir,
+            cache_db=cache_db,
+            manifest_path=manifest_path,
+            manifest=manifest,
+            rebuilt=rebuild,
+        )
+        self.entries.append(entry)
+        return entry
+
+    def _rebuild_cache(
+        self,
+        source_path: Path,
+        lo_config: LOPackageConfig,
+        cache_dir: Path,
+        cache_db: Path,
+    ) -> None:
+        remove_store(cache_db)
+
+        wrapper = QuadStoreWrapper(cache_db)
+        try:
+            main_ttl = source_path / "exports" / "main.ttl"
+            logger.debug("Importing %s → %s", main_ttl, lo_config.named_graphs.canonical)
+            wrapper.load_turtle_into_graph(main_ttl, lo_config.named_graphs.canonical)
+
+            governance_dir = source_path / "exports" / "governance"
+            if governance_dir.is_dir():
+                for ttl_file in sorted(governance_dir.glob("*.ttl")):
+                    logger.debug("Importing governance shard %s", ttl_file.name)
+                    wrapper.load_turtle_into_graph(ttl_file, lo_config.named_graphs.governance)
+        finally:
+            wrapper.close()
+
+    def sync_all(self, bindings: list[tuple[LOBinding, LOPackageConfig, Path]]) -> list[LOCacheEntry]:
+        self.entries.clear()
+        for binding, lo_config, source_path in bindings:
+            self.sync_binding(binding, lo_config, source_path)
+        return self.entries

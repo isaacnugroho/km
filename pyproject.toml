@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "km"
+version = "0.1.0"
+description = "Knowledge Management MCP — neuro-symbolic bridge for agent knowledge"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "mcp>=1.4.0",
+    "pydantic>=2.0",
+    "pyoxigraph>=0.4.0",
+    "rdflib>=7.0",
+    "pyshacl>=0.28",
+    "watchdog>=4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=5.0",
+]
+
+[project.scripts]
+km = "km.adapters.cli.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["km"]
+omit = ["tests/*"]
