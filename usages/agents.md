@@ -1,0 +1,153 @@
+# Agent Usage Guide: Interacting with KM MCP
+
+This document serves as the operational handbook for AI agents executing tasks in a workspace governed by the **Knowledge Management (KM) MCP**. It details the behavioral patterns, execution lifecycle integration, and tools usage protocols necessary to maintain semantic synchrony between code and knowledge.
+
+---
+
+## 1. The Neuro-Symbolic Agent Mindset
+
+As an agent operating in this workspace, you do not just write code; you manage the formal semantics of your implementation. You operate as a **neuro-symbolic bridge**:
+*   **The Symbolic:** The concrete source code, ASTs, and files in the workspace.
+*   **The Semantic:** The RDF hyper-graph tracking the facts, conventions, and rules of the design.
+
+Every structural change you make to the symbolic layer must be reflected, verified, and constrained in the semantic layer.
+
+```mermaid
+graph LR
+    Agent[LLM Agent] -->|1. Modifies Code| Code[(Symbolic Codebase)]
+    Agent -->|2. Ingests Facts| Case[Case Ontology Graph]
+    Case -->|3. Validates| SHACL[SHACL Shapes Engine]
+    SHACL -->|4. feedback / Halt| Agent
+
+    style Agent fill:#8b5cf6,stroke:#7c3aed,stroke-width:2px,color:#fff
+    style Code fill:#1e293b,stroke:#475569,stroke-width:1px,color:#fff
+    style Case fill:#0d9488,stroke:#0f766e,stroke-width:1px,color:#fff
+    style SHACL fill:#b91c1c,stroke:#991b1b,stroke-width:1px,color:#fff
+```
+
+---
+
+## 2. Agent Execution Lifecycle Integration
+
+You MUST integrate KM MCP tool operations into your standard execution loop at specific checkpoints.
+
+### Phase 1: Context Ingestion & Alignment (On Startup / Task Start)
+Before writing any code or proposing plans, align your context window with the workspace's loaded ontologies:
+1.  **Retrieve System Status:** Invoke `get_system_status` to determine the active Git branch and the loaded Learning Ontologies.
+2.  **Inspect Active Schemas:** Read the schema resource at `km://schemas/learning-ontologies` to understand available classes, properties, and constraint boundaries.
+3.  **Read Case Triples:** Load `km://case/active-graph` or execute targeted SPARQL read queries (`query_semantic_graph`) to understand what structural facts have already been established for this branch.
+
+### Phase 2: Fact Discovery & Ingestion (During Development)
+As you write code (e.g., creating components, modules, endpoints, or data models), you must discover and register the facts:
+1.  **Extract Semantics:** Identify concepts, types, and properties.
+2.  **Serialize as RDF:** Format the discoveries as JSON-LD or Turtle triples.
+3.  **Ingest Facts:** Invoke `ingest_case_facts` to write these facts into the active branch's Named Graph.
+
+> [!TIP]
+> Do not dump raw file contents into `ingest_case_facts`. Extract high-density structural facts such as dependency imports, event hook throttle rates, or service layer abstractions.
+
+### Phase 3: Constraint Verification (Before Turn End / Planning Completion)
+Before completing a task or presenting a completed change to the developer, verify system compliance:
+1.  **Run SHACL Linter:** Invoke `validate_constraints`.
+2.  **Interpret Validation Report:**
+    *   If `conforms` is `true`, proceed with confidence.
+    *   If `conforms` is `false`, analyze the `violations` array immediately. **DO NOT ignore validations.**
+
+---
+
+## 3. Detailed Tool Usage Patterns
+
+### 3.1 Dynamic Fact Ingestion (`ingest_case_facts`)
+When registering code features, express them using clean Turtle or JSON-LD syntax mapped to the schemas defined in your active Learning Ontologies.
+
+#### Python Example: Ingesting an API Controller Structure
+```python
+# The agent discovers a new controller that handles payment processing
+facts_turtle = """
+@prefix app: <http://app.local/vocabulary#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+app:PaymentController a app:RestController ;
+    app:route "/api/v1/payments" ;
+    app:governedBy app:StrictAuthPolicy ;
+    app:dependsOn app:StripeGatewayService ;
+    app:executionTimeoutMs 5000 .
+"""
+
+# Call ingest_case_facts
+mcp_client.call_tool(
+    "ingest_case_facts",
+    {"facts": facts_turtle, "format": "turtle"}
+)
+```
+
+---
+
+### 3.2 Executing Targeted SPARQL Queries (`query_semantic_graph`)
+Use compact SPARQL queries to locate patterns or find relationships instead of searching the directory recursively or parsing files manually.
+
+#### Ask: Find all REST Controllers that depend on Unsecured Services
+```sparql
+PREFIX app: <http://app.local/vocabulary#>
+
+SELECT ?controller ?route ?unsecuredService
+WHERE {
+    ?controller a app:RestController ;
+                app:route ?route ;
+                app:dependsOn ?unsecuredService .
+    
+    ?unsecuredService a app:ExternalService .
+    FILTER NOT EXISTS { ?unsecuredService app:hasSecurityLayer ?security }
+}
+```
+
+---
+
+### 3.3 Navigating Violations & Proposing Exceptions
+
+When `validate_constraints` flags a violation (e.g., an API route has an execution timeout that exceeds maximum global bounds), you have two choices:
+1.  **Refactor the Code:** Adjust the symbolic implementation to conform to the shape.
+2.  **Propose a Local Exception:** If there is a legitimate technical reason to bypass the shape, you must register a local exception.
+
+```mermaid
+sequenceDiagram
+    participant Agent
+    participant MCP as KM MCP Server
+    participant Human as Developer (Human)
+
+    Agent->>MCP: validate_constraints()
+    MCP-->>Agent: { conforms: false, violations: [Violation] }
+    Note over Agent: Analyze rationale for exception
+    Agent->>MCP: propose_local_exception(bypasses_shape, target_node, rationale)
+    MCP-->>Agent: { exception_id, status: PENDING_APPROVAL }
+    Agent->>Human: Prompts developer: "Requesting exception approval for Shape X..."
+    Human->>Agent: approve km://exceptions/uuid-123
+    Agent->>MCP: approve_local_exception(exception_id, signature)
+    MCP-->>Agent: { status: APPROVED }
+```
+
+#### Code Pattern: Proposing an Exception
+```python
+# A specific controller needs a longer timeout due to file-uploads
+mcp_client.call_tool(
+    "propose_local_exception",
+    {
+        "bypasses_shape": "http://ontologies.app.org/shapes#ExecutionTimeoutShape",
+        "target_node": "http://app.local/vocabulary#LargeUploadController",
+        "rationale": "Large document imports require streaming timeouts of up to 30000ms."
+    }
+)
+```
+*   **Next Step:** Present the generated `exception_id` to the developer and prompt them to run `approve <exception_id>` or `approve_local_exception` before completing the transaction.
+
+---
+
+## 4. Semantic MR Life Cycle (Knowledge Promotion)
+
+When a local pattern or structural extension proves to be globally useful, promote it to a static **Learning Ontology** via the semantic Merge Request pipeline:
+
+1.  **Draft Diff:** Assemble standard Turtle insertions and deletions (`diff_insertions` and `diff_deletions`).
+2.  **Submit MR:** Invoke `propose_semantic_mr` passing the target ontology and structural rationale.
+3.  **Generate Review File:** The system will output a markdown review file under `docs/mrs/` (or expose it as a virtual resource).
+4.  **Await Approval:** Stop your autonomous loop and request the developer to run `approve <mr-file-path>`.
+5.  **Re-align:** Once approved, invoke `get_system_status` to ensure your in-memory ontology caches are synchronized.
