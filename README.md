@@ -4,9 +4,19 @@ A neuro-symbolic knowledge management system for AI agents — dual-ontology des
 
 See [docs/knowledge-management-specification.md](docs/knowledge-management-specification.md) for the full engineering spec.
 
+## Roadmap status
+
+| Phase | Focus                                                     | Status   |
+| :---- | :-------------------------------------------------------- | :------- |
+| 1     | Bootstrap, LO cache, `get_system_status`, MCP/CLI surface | Complete |
+| 2     | Case ingest, SPARQL query, case export pipeline           | Complete |
+| 3     | SHACL validation, local exceptions, schema resources      | Complete |
+| 4     | Semantic merge requests, LO governance resources          | Complete |
+| 5     | Git branch sync, merge policies, `export-case` CLI        | Complete |
+
 ## Phase 1 status
 
-Phase 1 delivered a runnable MCP server with logging, tests, and stub gates.
+Phase 1 delivered a runnable MCP server with logging, tests, and feature gates.
 
 ## Phase 2 status
 
@@ -27,7 +37,26 @@ Phase 3 adds constraint enforcement and exception workflow:
 - `km://case/active-exceptions` — pending and approved exceptions on active branch
 - Real `pending_exceptions_count` in `get_system_status`
 
-Still stubbed: semantic MR (Phase 4), git branch sync (Phase 5), `km export-case` CLI.
+## Phase 4 status
+
+Phase 4 adds semantic merge request governance:
+
+- `propose_semantic_mr` / `approve_semantic_mr` — curator-mode LO promotion (requires `mode: "curator"` on binding)
+- `km://learning-ontologies/{id}/canonical` — canonical graph from workspace cache
+- `km://learning-ontologies/{id}/governance` — MR records from source LO store
+- `km://mr/{ontology-id}/{mr-id}` — derived review markdown (`.km/mrs/`)
+- Real `pending_mrs_count` in `get_system_status`; LO cache + SHACL refresh on MR approve
+
+## Phase 5 status
+
+Phase 5 adds Git-aligned case lifecycle:
+
+- Git ref watcher (MCP daemon) — branch switch detection, context swap, inheritance
+- Branch inheritance — clone-on-write from parent when a new branch graph is empty
+- Merge resolver — `auto_merge`, `auto_merge_exception` (default), `no_auto_merge` policies
+- `km merge-resolve` — resolve pending prompts in `.km/pending-merge-{event-id}.json`
+- `km export-case` — export active branch graph + manifest
+- `km init --with-hooks` — install pre-commit hook for `on_commit` export policy
 
 ## Install
 
@@ -49,6 +78,8 @@ Initialize a workspace in your project root (creates `.km/config.json` and `case
 
 ```bash
 km init
+# optional: install pre-commit hook when export_policy is on_commit
+km init --with-hooks
 ```
 
 Print system status:
@@ -87,11 +118,11 @@ The repo includes a sample LO at [usages/ontologies/hexagonal-architecture/](usa
 
 ## Logging
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `KM_LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
-| `KM_LOG_FILE` | — | Optional log file path |
-| `KM_WORKSPACE_ROOT` | — | Override workspace root discovery |
+| Variable            | Default | Description                         |
+| :------------------ | :------ | :---------------------------------- |
+| `KM_LOG_LEVEL`      | `INFO`  | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
+| `KM_LOG_FILE`       | —       | Optional log file path              |
+| `KM_WORKSPACE_ROOT` | —       | Override workspace root discovery   |
 
 All logs go to **stderr** (safe for MCP stdio).
 
@@ -103,24 +134,25 @@ pytest
 
 ## MCP tools
 
-| Tool | Status |
-|------|--------|
-| `get_system_status` | Implemented |
-| `ingest_case_facts` | Implemented |
-| `query_semantic_graph` | Implemented |
-| `validate_constraints` | Implemented |
-| `propose_local_exception` | Implemented |
-| `approve_local_exception` | Implemented |
-| `propose_semantic_mr` | Stub (Phase 4) |
-| `approve_semantic_mr` | Stub (Phase 4) |
+| Tool                      | Status                        |
+| :------------------------ | :---------------------------- |
+| `get_system_status`       | Implemented                   |
+| `ingest_case_facts`       | Implemented                   |
+| `query_semantic_graph`    | Implemented                   |
+| `validate_constraints`    | Implemented                   |
+| `propose_local_exception` | Implemented                   |
+| `approve_local_exception` | Implemented                   |
+| `propose_semantic_mr`     | Implemented (curator binding) |
+| `approve_semantic_mr`     | Implemented (curator binding) |
 
-Resources: `km://case/active-graph`, `km://case/active-exceptions`, and `km://schemas/learning-ontologies` are implemented. LO canonical/governance and MR resources remain stubs (Phase 4).
+Resources: all six MCP resources are implemented (`km://schemas/learning-ontologies`, `km://case/active-graph`, `km://case/active-exceptions`, `km://learning-ontologies/{id}/canonical`, `km://learning-ontologies/{id}/governance`, `km://mr/{ontology-id}/{mr-id}`).
 
 ## CLI commands
 
-| Command | Description |
-|---------|-------------|
-| `km init [--path DIR]` | Create `.km/config.json` and case-exports dirs |
-| `km status` | Print system status JSON |
-| `km mcp` | Start MCP stdio server |
-| `km export-case` | Stub (Phase 5) |
+| Command                               | Description                                                |
+| :------------------------------------ | :--------------------------------------------------------- |
+| `km init [--path DIR] [--with-hooks]` | Create `.km/config.json` and case-exports dirs             |
+| `km status`                           | Print system status JSON                                   |
+| `km mcp`                              | Start MCP stdio server (enables git watcher)               |
+| `km export-case`                      | Export active branch graph to `case-exports/`              |
+| `km merge-resolve EVENT RESOLUTION`   | Resolve pending merge (`MERGE`, `KEEP_ISOLATED`, `DELETE`) |
