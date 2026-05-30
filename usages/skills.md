@@ -105,6 +105,8 @@ sequenceDiagram
     > To approve this bypass, please reply with the following command:
     > ```
     > approve km://case/active-exceptions/uuid-88aef402-990a
+    >
+    > Use the exact `exception_id` URI returned by `propose_local_exception`.
     > ```
 5.  **Await Approval:** Pause agent execution until the human developer submits the approval.
 6.  **Apply Signature:** Once approved, invoke `approve_local_exception` using the developer's approval signature to permanently register the exception in the branch graph.
@@ -119,17 +121,20 @@ sequenceDiagram
 sequenceDiagram
     participant Agent
     participant MCP as KM MCP Server
-    participant LO as LO lo_quads.db
+    participant LO as Source LO lo_quads.db
+    participant Cache as .km/lo-cache/
     participant Human as Developer
 
     Agent->>MCP: propose_semantic_mr(target_ontology, rationale, diff)
-    MCP->>LO: Write proposal graph + governance triples (source package)
+    MCP->>LO: Write proposal graph + governance triples
+    MCP->>LO: Regenerate exports/governance.ttl
     MCP->>MCP: Generate derived review doc .km/mrs/mr-042.md
-    MCP-->>Agent: { mr_id, status: PENDING }
+    MCP-->>Agent: { mr_id, status: PENDING_APPROVAL }
     Agent->>Human: Prompts: approve .km/mrs/mr-042.md
     Human->>Agent: approve .km/mrs/mr-042.md
     Agent->>MCP: approve_semantic_mr(doc_identifier)
     MCP->>LO: Merge proposal → canonical; regenerate exports/
+    MCP->>Cache: Full cache rebuild
     MCP-->>Agent: { status: APPROVED, mr_id, target_ontology, timestamp }
     Agent->>MCP: get_system_status()
 ```

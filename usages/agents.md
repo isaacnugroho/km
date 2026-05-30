@@ -121,7 +121,7 @@ sequenceDiagram
     Agent->>MCP: propose_local_exception(bypasses_shape, target_node, rationale)
     MCP-->>Agent: { exception_id, status: PENDING_APPROVAL }
     Agent->>Human: Prompts developer: "Requesting exception approval for Shape X..."
-    Human->>Agent: approve km://exceptions/uuid-123
+    Human->>Agent: approve km://case/active-exceptions/{exception-id}
     Agent->>MCP: approve_local_exception(exception_id, signature)
     MCP-->>Agent: { status: APPROVED }
 ```
@@ -138,7 +138,7 @@ mcp_client.call_tool(
     }
 )
 ```
-*   **Next Step:** Present the generated `exception_id` to the developer and prompt them to run `approve <exception_id>` or `approve_local_exception` before completing the transaction.
+*   **Next Step:** Present the generated `exception_id` to the developer and prompt them to run `approve km://case/active-exceptions/{exception-id}` before completing the transaction.
 
 ---
 

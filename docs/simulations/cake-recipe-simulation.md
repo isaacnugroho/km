@@ -214,11 +214,11 @@ The agent registers a proposed exception:
 ```json
 {
   "@id": "recipe:exceptions/bloomed_cocoa_emulsion_folding",
-  "@type": "baking:LocalException",
-  "baking:bypassesShape": "baking:EggWhiteFoamShape",
-  "baking:targetNode": "recipe:process/step_2",
-  "baking:rationale": "High-fat Dutch cocoa is emulsified with yolk lecithin and water before folding. Mechanical folding replaces direct high-speed mixing, mitigating foam degradation.",
-  "baking:status": "PENDING_HUMAN_APPROVAL"
+  "@type": "km:LocalException",
+  "km:bypassesShape": "baking:EggWhiteFoamShape",
+  "km:targetNode": "recipe:process/step_2",
+  "km:rationale": "High-fat Dutch cocoa is emulsified with yolk lecithin and water before folding. Mechanical folding replaces direct high-speed mixing, mitigating foam degradation.",
+  "km:status": "PENDING_APPROVAL"
 }
 ```
 

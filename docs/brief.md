@@ -1,9 +1,11 @@
 # Brief
 
-The **Knowledge Management MCP** is a neuro-symbolic bridge designed to capture the "How" (processes, rationale, exceptions) and the "What" of problem analysis and design. It operates on a version-controlled semantic hyper-graph utilizing a dual-ontology design, with validation and integrity constraints enforced via **SHACL (Shapes Constraint Language)**:
+The **Knowledge Management MCP** is a neuro-symbolic bridge designed to capture the "How" (processes, rationale, exceptions) and the "What" of problem analysis and design. It operates on a version-controlled semantic **quad-store** hyper-graph utilizing a dual-ontology design, with validation and integrity constraints enforced via **SHACL (Shapes Constraint Language)**:
+
+**Terminology**
 
 1. **The Learning Ontologies:** Ontology of ontologies to capture the "How" of knowledge domains.
-2. **The Case Ontologies:** Local, dynamic, and situational realities derived from problem analysis and design.
+2. **The Case Ontology:** Local, dynamic, and situational realities derived from problem analysis and design. *(singular — one Case Ontology per workspace)*
 
 KM is MCP tool for managing agent knowledge/memory to prevent hallucination and provide clearer context
 
@@ -20,9 +22,9 @@ Learning ontologies are collection of knowledge organized or categorized by doma
 
 Adding knowledge to the learning ontology involves the following steps:
 1. Identify new concepts and relationships.
-2. Create a merge request with a semantic diff — recorded in the LO governance graph and a proposal named graph inside `lo_quads.db`.
-3. Human reviews and approves the merge request (via generated review document or governance export).
-4. The canonical graph is updated only after approval; `exports/main.ttl` and `exports/governance.ttl` are regenerated for Git commit.
+2. Create a merge request with a semantic diff — recorded in the **source** LO governance graph and a proposal named graph inside `{source}/lo_quads.db` (requires `mode: "curator"` on the binding).
+3. Human reviews and approves the merge request (via derived review document at `.km/mrs/` or `km://mr/{ontology-id}/{mr-id}`).
+4. The canonical graph is updated only after approval; `{source}/exports/main.ttl` and `{source}/exports/governance.ttl` are regenerated; workspace cache is fully rebuilt on approve/reject only (not on propose).
 
 > [!NOTE]
 > **Domain-Specific Merge Requests:** A "Merge Request" (MR) within the KM system is an *internal, semantic-level concept* rather than a Git/GitHub/GitLab hosting platform PR/MR. While it conceptually mirrors the propose-review-approve-merge lifecycle, it is executed and tracked entirely within the target Learning Ontology's quad-store governance graph.
@@ -35,13 +37,13 @@ Adding knowledge to the learning ontology involves the following steps:
 >     ```
 >     approve <doc name>
 >     ```
->     *(e.g., `approve km://mr/react-conventions/mr-402` or `approve .km/mrs/mr-react-conventions-042.md`)*
+>     *(e.g., `approve km://mr/react-conventions/MR-042` or `approve .km/mrs/mr-react-conventions-042.md`)*
 > 
 >     The agent translates this command into an `approve_semantic_mr` MCP tool call (see MCP Tools below).
 
 ## The Case Ontology
 
-Case ontologies:
+The Case Ontology:
 - Located in the workspace/working directory (`.km/case_quads.db`)
 - References learning ontologies via **object bindings** in `.km/config.json`, not by requiring LO directories in the workspace tree
 - Has knowledge related to the current problem/case being solved, including the facts, concepts, relationship, rules and process being applied
@@ -98,20 +100,20 @@ How are logical contradictions and rule violations managed?
 
 ## MCP Server Interface
 
-The KM MCP Server exposes eight Tools and five Resources to the host agent, enabling seamless reading, writing, validation, and human-in-the-loop control of the semantic graph.
+The KM MCP Server exposes eight Tools and six Resources to the host agent, enabling seamless reading, writing, validation, and human-in-the-loop control of the semantic graph.
 
 ### 1. MCP Tools
 
-| Tool Name                 | Parameters                                                                                           | Returns                                                                                      | Description                                                                                                                                                                                  |
-| :------------------------ | :--------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ingest_case_facts`       | `facts` (JSON-LD or Turtle string), `format` (string)                                                | `{ "status": "success", "triples_added": int }`                                              | Ingests new contextual facts, concepts, and relationships from the active case into the named graph mapped to the active branch.                                                             |
-| `validate_constraints`    | *None*                                                                                               | `{ "conforms": bool, "violations": [Violation] }`                                            | Runs SHACL validation on the active named graph against shapes from LO **canonical graphs** only. Halts execution if violations are found and no approved local exception exists. |
-| `propose_local_exception` | `bypasses_shape` (URI), `target_node` (URI), `rationale` (string)                                    | `{ "exception_id": URI, "status": "PENDING_APPROVAL" }`                                      | Declares a local exception to bypass a specific SHACL shape for a given focus node. Returns details so the agent can prompt the human developer.                                             |
-| `approve_local_exception` | `exception_id` (URI), `approver` (string), `signature` (string)                                      | `{ "status": "APPROVED", "timestamp": string }`                                              | Records human approval signature and timestamp, enabling the SHACL linter to bypass the specified shape constraint.                                                                          |
-| `query_semantic_graph`    | `query` (SPARQL query string)                                                                        | SPARQL Select/Ask Result (JSON)                                                              | Executes a read-only SPARQL query over the merged active Case named graph and LO **canonical graphs** only.                                                                                  |
-| `propose_semantic_mr`     | `target_ontology` (URI), `rationale` (string), `diff_insertions` (Turtle), `diff_deletions` (Turtle) | `{ "mr_id": URI, "status": "PENDING" }`                                                      | Creates a semantic MR in the **source** LO store (requires `mode: "curator"`); generates a derived review document in `.km/mrs/`. |
-| `get_system_status`       | *None*                                                                                               | `{ "active_branch": string, "learning_ontologies": [Binding], "pending_exceptions_count": int, "pending_mrs_count": int }` | Returns runtime state including resolved LO bindings (ontology_id, source, mode, cache_path, cache_synced_at), pending exceptions, and pending MRs. |
-| `approve_semantic_mr`     | `doc_identifier` (string)                                                                            | `{ "status": "APPROVED", "mr_id": URI, "target_ontology": URI, "timestamp": string }`        | Merges in **source** LO store (requires `mode: "curator"`), regenerates source exports, refreshes workspace cache, reloads in-memory LO cache. |
+| Tool Name                 | Parameters                                                                                           | Returns                                                                                                                    | Description                                                                                                                                                                       |
+| :------------------------ | :--------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ingest_case_facts`       | `facts` (JSON-LD or Turtle string), `format` (string)                                                | `{ "status": "success", "triples_added": int }`                                                                            | Ingests new contextual facts, concepts, and relationships from the active case into the named graph mapped to the active branch.                                                  |
+| `validate_constraints`    | *None*                                                                                               | `{ "conforms": bool, "violations": [Violation] }`                                                                          | Runs SHACL validation on the active named graph against shapes from LO **canonical graphs** only. Halts execution if violations are found and no approved local exception exists. |
+| `propose_local_exception` | `bypasses_shape` (URI), `target_node` (URI), `rationale` (string)                                    | `{ "exception_id": URI, "status": "PENDING_APPROVAL" }`                                                                    | Declares a local exception to bypass a specific SHACL shape for a given focus node. Returns details so the agent can prompt the human developer.                                  |
+| `approve_local_exception` | `exception_id` (URI), `approver` (string), `signature` (string)                                      | `{ "status": "APPROVED", "timestamp": string }`                                                                            | Records human approval signature and timestamp, enabling the SHACL linter to bypass the specified shape constraint.                                                               |
+| `query_semantic_graph`    | `query` (SPARQL query string)                                                                        | SPARQL Select/Ask Result (JSON)                                                                                            | Executes a read-only SPARQL query over the merged active Case named graph and LO **canonical graphs** only.                                                                       |
+| `propose_semantic_mr`     | `target_ontology` (URI), `rationale` (string), `diff_insertions` (Turtle), `diff_deletions` (Turtle) | `{ "mr_id": URI, "status": "PENDING_APPROVAL" }`                                                                           | Creates a semantic MR in the **source** LO store (requires `mode: "curator"`); generates a derived review document in `.km/mrs/`.                                                 |
+| `get_system_status`       | *None*                                                                                               | `{ "active_branch": string, "learning_ontologies": [Binding], "pending_exceptions_count": int, "pending_mrs_count": int }` | `pending_mrs_count` from **source** governance graphs.                                                                                                                            |
+| `approve_semantic_mr`     | `doc_identifier` (string)                                                                            | `{ "status": "APPROVED", "mr_id": URI, "target_ontology": URI, "timestamp": string }`                                      | Merges in **source** LO store (requires `mode: "curator"`), regenerates source exports, refreshes workspace cache, reloads in-memory LO cache.                                    |
 
 ### 2. MCP Resources
 
@@ -121,7 +123,8 @@ The server exposes read-only structural data to the host agent to clarify schema
 - **`km://case/active-graph`**: Returns the complete serialized RDF model of the current Git branch's named graph.
 - **`km://case/active-exceptions`**: Lists all active local exceptions (both pending and approved) registered for the current workspace.
 - **`km://learning-ontologies/{ontology-id}/canonical`**: Returns the serialized canonical graph for a specific Learning Ontology.
-- **`km://learning-ontologies/{ontology-id}/governance`**: Returns MR governance records for a specific Learning Ontology (curator review).
+- **`km://learning-ontologies/{ontology-id}/governance`**: Returns MR governance records from **source** LO store (curator review).
+- **`km://mr/{ontology-id}/{mr-id}`**: Returns derived MR review document.
 
 ## Implementation
 

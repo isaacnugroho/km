@@ -126,11 +126,11 @@ The configuration defines workspace identification, **Learning Ontology bindings
 #### Learning Ontology Binding Schema
 Each entry in `learning_ontologies` is an object:
 
-| Field | Required | Description |
-| :---- | :------- | :---------- |
-| `ontology_id` | Yes | Stable logical identifier; drives named graph URIs and MCP resources. |
-| `source` | Yes | Filesystem path to the LO package root (directory containing `config.json` and `exports/`). |
-| `mode` | Yes | `"read_only"` (consumer) or `"curator"` (may propose and approve MRs). |
+| Field         | Required | Description                                                                                 |
+| :------------ | :------- | :------------------------------------------------------------------------------------------ |
+| `ontology_id` | Yes      | Stable logical identifier; drives named graph URIs and MCP resources.                       |
+| `source`      | Yes      | Filesystem path to the LO package root (directory containing `config.json` and `exports/`). |
+| `mode`        | Yes      | `"read_only"` (consumer) or `"curator"` (may propose and approve MRs).                      |
 
 #### Path Resolution Rules
 `source` paths are resolved as follows:
@@ -141,10 +141,10 @@ Each entry in `learning_ontologies` is an object:
 Named graph URIs (`http://km.local/learning-ontologies/{ontology_id}/…`) depend on `ontology_id` only, never on `source` path.
 
 #### Access Modes
-| Mode | Validation / query | `propose_semantic_mr` | `approve_semantic_mr` |
-| :--- | :----------------- | :-------------------- | :-------------------- |
-| `read_only` | Yes (cached canonical only) | Rejected | Rejected |
-| `curator` | Yes (cached canonical only) | Writes to **source** LO store | Merges in **source** LO store; refreshes cache |
+| Mode        | Validation / query          | `propose_semantic_mr`         | `approve_semantic_mr`                          |
+| :---------- | :-------------------------- | :---------------------------- | :--------------------------------------------- |
+| `read_only` | Yes (cached canonical only) | Rejected                      | Rejected                                       |
+| `curator`   | Yes (cached canonical only) | Writes to **source** LO store | Merges in **source** LO store; refreshes cache |
 
 ### 2.3 Workspace LO Cache
 Each binding materializes a local runtime cache under `.km/lo-cache/{ontology-id}/`:
@@ -158,7 +158,12 @@ Each binding materializes a local runtime cache under `.km/lo-cache/{ontology-id
 #### Cache Synchronization (Startup)
 On MCP server startup, for each binding:
 1.  **Resolve** `source` to an absolute path; fail fast if the LO package or `exports/main.ttl` is missing.
-2.  **Compare** export checksums in `sync-manifest.json` against `{source}/exports/main.ttl` and `governance.ttl`.
+
+**Empty governance bootstrap**
+
+If `{source}/exports/governance.ttl` is absent (new LO package), treat it as an empty governance graph: create the file with a minimal header comment, or import zero triples. Cache sync MUST NOT fail on missing governance export; record `"governance.ttl": null` in `export_checksums` until the first MR is proposed.
+
+2.  **Compare** export checksums in `sync-manifest.json` against `{source}/exports/main.ttl` and `governance.ttl` (when present).
 3.  **Rebuild cache** if the manifest is absent, checksums differ, or `lo_quads.db` is missing — import exports into `.km/lo-cache/{ontology-id}/lo_quads.db`.
 4.  **Load canonical** graphs from the cache into the in-memory schema cache.
 
@@ -176,8 +181,27 @@ On MCP server startup, for each binding:
 }
 ```
 
-*   **Agent reads** always target the workspace cache (`lo-cache/`), never the source path directly.
-*   **Curator writes** (MR propose/approve) target the **source** LO package's `lo_quads.db`, regenerate `{source}/exports/`, then **refresh the workspace cache** from the updated exports.
+*   **Agent reads** always target the workspace cache (`lo-cache/`) **canonical graphs**. Curator-only reads of governance, MR proposals, and pending MR counts use the **source** LO store (see table below).
+
+**Source vs cache read rules**
+
+| Operation                                              | Data source                                     | Notes                                                         |
+| :----------------------------------------------------- | :---------------------------------------------- | :------------------------------------------------------------ |
+| `validate_constraints`                                 | Cache — canonical graph only                    | Never includes pending MR proposal graphs                     |
+| `query_semantic_graph` (default)                       | Cache — active Case graph + LO canonical graphs | Default union excludes governance and proposal graphs         |
+| `query_semantic_graph` (explicit `GRAPH …/mr/{mr-id}`) | **Source** `{source}/lo_quads.db`               | Curator mode only; proposal quads are not copied to cache     |
+| `km://schemas/learning-ontologies`                     | Cache — canonical                               | Agent-facing schema reads                                     |
+| `km://learning-ontologies/{id}/canonical`              | Cache — canonical                               |                                                               |
+| `km://learning-ontologies/{id}/governance`             | **Source** `{source}/lo_quads.db`               | Curator review; always current, including pending MRs         |
+| `km://mr/{ontology-id}/{mr-id}`                        | **Source** governance + proposal graphs         | Derived MR review document                                    |
+| `pending_mrs_count` (`get_system_status`)              | **Source** governance graph                     | Counts `km:status "PENDING_APPROVAL"` across curator bindings |
+| `propose_semantic_mr` / `approve_semantic_mr` writes   | **Source** `{source}/lo_quads.db`               | Then sync exports and refresh cache (see below)               |
+
+**Cache refresh on MR lifecycle:**
+1. **On propose:** Regenerate `{source}/exports/governance.ttl`; cache is not updated. Canonical cache unchanged.
+2. **On approve/reject:** Regenerate both exports; **full cache rebuild** from exports; reload in-memory canonical cache.
+
+*   **Curator writes** (MR propose/approve) target the **source** LO package's `lo_quads.db` and regenerate `{source}/exports/`. On **propose**, the workspace cache is not updated; on **approve/reject**, the cache is fully rebuilt from exports (see above).
 
 ### 2.4 Learning Ontology Source Package Structure
 Each LO source package is self-contained regardless of where it lives on disk.
@@ -221,7 +245,15 @@ The `ontology_id` in `{source}/config.json` MUST match the `ontology_id` in the 
 └──────────────────────────────────────────────────────────────────────┴─────────────────────────────────────────┘
 ```
 
-*   **`lo_quads.db` is runtime-only.** It is listed in `.gitignore` and rebuilt or synchronized from exports on startup when absent or stale.
+**Which `lo_quads.db` bootstraps from exports**
+
+| Store               | Location                                 | Bootstrap rule                                                                                                          |
+| :------------------ | :--------------------------------------- | :---------------------------------------------------------------------------------------------------------------------- |
+| **Workspace cache** | `.km/lo-cache/{ontology-id}/lo_quads.db` | Rebuilt from `{source}/exports/` on startup when manifest absent or checksums differ; full rebuild on MR approve/reject |
+| **Source package**  | `{source}/lo_quads.db`                   | Rebuilt from `{source}/exports/` when opened for curator writes if absent or stale; not used for agent reads            |
+
+Both stores are runtime-only and Git-ignored. Git authority remains `{source}/exports/main.ttl` and `{source}/exports/governance.ttl`.
+
 *   **`exports/main.ttl`** is the Git-authoritative snapshot of the canonical graph, suitable for human diff review in pull requests.
 *   **`exports/governance.ttl`** is the Git-authoritative snapshot of all MR records (pending, approved, rejected).
 
@@ -259,7 +291,7 @@ graph TD
 *   **Cache-First Reads:** All agent validation and query operations read from `.km/lo-cache/{ontology-id}/lo_quads.db`, not from `{source}/lo_quads.db` directly.
 *   **Bootstrap from Exports:** If a cache `lo_quads.db` is missing or stale (checksum mismatch), the daemon imports `{source}/exports/main.ttl` and `governance.ttl` into the cache before serving requests.
 *   **Static Loading:** Canonical graphs and SHACL shapes are loaded and cached in-memory *exactly once* during MCP server startup. Governance and pending MR proposal graphs are loaded on demand for curator workflows only.
-*   **Post-MR Cache Refresh:** After `approve_semantic_mr` in a curator workspace, the daemon regenerates `{source}/exports/`, re-syncs the workspace cache, and reloads the in-memory canonical cache.
+*   **Post-MR Cache Refresh:** On propose, source exports are updated but the workspace cache is not. On approve/reject, full cache rebuild from exports and reload in-memory canonical cache.
 *   **Parsing Bypass:** Future validations bypass the standard RDF graph parsing phase (`rdflib.Graph().parse()`), reducing validation startup time from ~150ms to <1ms.
 
 ### 3.3 Scoped Named Graph Queries
@@ -288,7 +320,7 @@ Running a comprehensive SHACL validation (`pyshacl`) on large graphs on every in
 
 ## 4. MCP Server Interface: Tools & Resources Specifications
 
-The KM MCP Server exposes a standard interface enabling reading, writing, validation, and human-in-the-loop control via **eight MCP tools** and **five MCP resources**.
+The KM MCP Server exposes a standard interface enabling reading, writing, validation, and human-in-the-loop control via **eight MCP tools** and **six MCP resources**.
 
 ### 4.1 MCP Tools Specification
 
@@ -346,6 +378,11 @@ Executes incremental SHACL validation against the pre-compiled **canonical** LO 
 
 #### 3. `propose_local_exception`
 Registers a proposed local exception for a specific SHACL shape constraint on a specific focus node.
+
+Canonical exception lifecycle status values: `PENDING_APPROVAL`, `APPROVED`.
+Exception metadata uses `km:` properties.
+Approval command: `approve km://case/active-exceptions/{exception-id}`.
+
 *   **Parameters Schema:**
     ```json
     {
@@ -397,7 +434,7 @@ Registers the developer's approval signature and timestamp, enabling the SHACL v
     ```
 
 #### 5. `query_semantic_graph`
-Executes a read-only SPARQL query over the active Case named graph and **canonical** LO graphs only. Pending MR proposal graphs are excluded unless the query explicitly targets a proposal graph URI (curator workflows).
+Executes a read-only SPARQL query over the active Case named graph and **canonical** LO graphs only. Pending MR proposal graphs are excluded from the default union; curators may query proposal graphs by explicit `GRAPH` URI against **source** `{source}/lo_quads.db`.
 *   **Parameters Schema:**
     ```json
     {
@@ -426,12 +463,18 @@ Executes a read-only SPARQL query over the active Case named graph and **canonic
 
 #### 6. `propose_semantic_mr`
 Initiates a Merge Request to promote locally discovered patterns from the Case Ontology into a global Learning Ontology. Requires `mode: "curator"` on the target binding. Writes proposal quads to the **source** LO's `mr/{mr-id}` graph and MR metadata to the source governance graph; generates a human-review markdown view under `.km/mrs/` (derived, not authoritative).
+
+The `target_ontology` parameter accepts either:
+1. **`base_uri`** — matches `{source}/config.json` → `base_uri` (e.g. `http://ontologies.react.org/core`), or
+2. **`ontology_id`** — matches the workspace binding → `ontology_id` (e.g. `react-conventions`).
+
+Resolution order: exact `base_uri` match → exact `ontology_id` match → error. The resolved binding MUST have `mode: "curator"`.
 *   **Parameters Schema:**
     ```json
     {
       "type": "object",
       "properties": {
-        "target_ontology": { "type": "string", "description": "URI of the target Learning Ontology" },
+        "target_ontology": { "type": "string", "description": "base_uri or ontology_id of the target LO" },
         "rationale": { "type": "string", "description": "Engineering rationale for the promotion" },
         "diff_insertions": { "type": "string", "description": "Turtle-serialized RDF triples to add" },
         "diff_deletions": { "type": "string", "description": "Turtle-serialized RDF triples to remove" }
@@ -439,13 +482,16 @@ Initiates a Merge Request to promote locally discovered patterns from the Case O
       "required": ["target_ontology", "rationale", "diff_insertions"]
     }
     ```
+
+Canonical MR lifecycle status values: `PENDING_APPROVAL`, `APPROVED`, `REJECTED`. Tool responses use `PENDING_APPROVAL` on propose.
+
 *   **Response Schema:**
     ```json
     {
       "type": "object",
       "properties": {
         "mr_id": { "type": "string" },
-        "status": { "type": "string", "enum": ["PENDING"] }
+        "status": { "type": "string", "enum": ["PENDING_APPROVAL"] }
       },
       "required": ["mr_id", "status"]
     }
@@ -475,7 +521,7 @@ Returns environmental and memory states of the KM daemon.
           }
         },
         "pending_exceptions_count": { "type": "integer" },
-        "pending_mrs_count": { "type": "integer" }
+        "pending_mrs_count": { "type": "integer", "description": "Count of km:status PENDING_APPROVAL in source governance graphs" }
       },
       "required": ["active_branch", "learning_ontologies", "pending_exceptions_count", "pending_mrs_count"]
     }
@@ -525,12 +571,24 @@ Resources allow the client agent to perform bulk reads of schema metadata and ac
 3.  **`km://case/active-exceptions`**
     *   **Description:** Retrieves all local exceptions (pending and approved) currently declared within the active workspace branch scope.
     *   **Format:** `application/json`
+
+Individual exceptions are addressable as `km://case/active-exceptions/{exception-id}` where `{exception-id}` matches the `@id` / `exception_id` URI returned by `propose_local_exception`. 
+The developer approval command is: `approve km://case/active-exceptions/{exception-id}`.
+
 4.  **`km://learning-ontologies/{ontology-id}/canonical`**
     *   **Description:** Returns the serialized canonical graph for a specific Learning Ontology.
     *   **Format:** `text/turtle`
 5.  **`km://learning-ontologies/{ontology-id}/governance`**
-    *   **Description:** Returns MR governance records for a specific Learning Ontology (curator review).
+    *   **Description:** Returns MR governance records for a specific Learning Ontology. Reads from **source** `{source}/lo_quads.db`, not the workspace cache.
     *   **Format:** `text/turtle`
+6.  **`km://mr/{ontology-id}/{mr-id}`**
+
+**MR resource URI**
+
+*   **Description:** Returns a derived MR review document (markdown or JSON wrapper) for a pending or approved semantic Merge Request, materialized from **source** governance + proposal graphs.
+*   **Format:** `text/markdown`
+*   **URI convention:** `km://mr/{ontology-id}/{mr-id}` where `{mr-id}` is the short id (e.g. `MR-042`, not `mr-react-conventions-042`). Equivalent file path: `.km/mrs/mr-{ontology-id}-{mr-id-suffix}.md`.
+*   **Approval command examples:** `approve km://mr/react-conventions/MR-042` or `approve .km/mrs/mr-react-conventions-042.md`
 
 ---
 
@@ -596,9 +654,9 @@ sequenceDiagram
     
     rect rgb(30, 20, 40)
         Note over Agent, Dev: Exception Authorization Loop
-        Agent->>DB: Register proposed exception (LocalException)
-        Agent-->>Dev: Prompts Developer with Rationale
-        Dev->>Agent: Click [ Approve Exception ]
+        Agent->>DB: Register proposed exception (km:LocalException)
+        Agent-->>Dev: Prompts: approve km://case/active-exceptions/{exception-id}
+        Dev->>Agent: approve km://case/active-exceptions/{exception-id}
         Agent->>DB: Write approval signature & timestamp to graph
     end
     
@@ -636,24 +694,27 @@ dist:IdempotentMessageShape a sh:NodeShape ;
 ```
 
 #### 2. The Local Exception Bypass Definition (Turtle)
+
+Local exceptions use the **`km:`** governance namespace for bypass metadata, regardless of which LO shape is bypassed. Domain LOs MAY define `*:LocalException` as an OWL class; the validator matches on `km:bypassesShape`, `km:targetNode`, and `km:status`.
+
 When an exception is proposed and authorized, it is serialized directly into the active Case named graph:
 
 ```turtle
-@prefix baking: <http://ontologies.baking.org/core#> .
+@prefix km: <http://km.local/governance#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix case: <http://km.local/cases/> .
 @prefix exception: <http://km.local/exceptions/> .
 @prefix dist: <http://ontologies.distributed-systems.org/core#> .
 
 # Local exception injected into case named graph
-exception:ephemeral_coordinates_bypass a dist:LocalException ;
-    baking:bypassesShape dist:IdempotentMessageShape ;
-    baking:targetNode case:network/canvas_drag_event ;
-    baking:rationale "High-frequency absolute mouse coordinates (60Hz) are ephemeral. Absolute position is self-superseding, making duplicate protection redundant." ;
-    baking:status "APPROVED" ;
-    baking:approvedBy "DeveloperJohn" ;
-    baking:signature "sig_ab23d04fde103bc" ;
-    baking:timestamp "2026-05-30T02:20:00Z"^^xsd:dateTime .
+exception:ephemeral_coordinates_bypass a km:LocalException ;
+    km:bypassesShape dist:IdempotentMessageShape ;
+    km:targetNode case:network/canvas_drag_event ;
+    km:rationale "High-frequency absolute mouse coordinates (60Hz) are ephemeral. Absolute position is self-superseding, making duplicate protection redundant." ;
+    km:status "APPROVED" ;
+    km:approvedBy "DeveloperJohn" ;
+    km:signature "sig_ab23d04fde103bc" ;
+    km:timestamp "2026-05-30T02:20:00Z"^^xsd:dateTime .
 ```
 
 ### 6.2 The Exception Checking Algorithm
@@ -675,10 +736,10 @@ def check_conformance(store: pyoxigraph.Store, active_graph_uri: str) -> tuple[b
         exception_query = f"""
             ASK WHERE {{
                 GRAPH <{active_graph_uri}> {{
-                    ?exception a ?exceptionType ;
-                               <http://ontologies.baking.org/core#bypassesShape> <{violated_shape}> ;
-                               <http://ontologies.baking.org/core#targetNode> <{focus_node}> ;
-                               <http://ontologies.baking.org/core#status> "APPROVED" .
+                    ?exception a km:LocalException ;
+                               km:bypassesShape <{violated_shape}> ;
+                               km:targetNode <{focus_node}> ;
+                               km:status "APPROVED" .
                 }}
             }}
         """
@@ -691,7 +752,7 @@ def check_conformance(store: pyoxigraph.Store, active_graph_uri: str) -> tuple[b
     conforms_now = len(filtered_results) == 0
     return conforms_now, filtered_results
 ```
-*   **Result:** By embedding the exception metadata (`bypassesShape`, `targetNode`, `status "APPROVED"`) directly into the branch-scoped Case Named Graph, the validator can quickly resolve conflicts, keeping validation latency well within the <200ms threshold while ensuring complete architectural safety.
+*   **Result:** By embedding exception metadata (`km:bypassesShape`, `km:targetNode`, `km:status "APPROVED"`) directly into the branch-scoped Case Named Graph, the validator can quickly resolve conflicts, keeping validation latency well within the <200ms threshold while ensuring complete architectural safety.
 
 ---
 
@@ -721,9 +782,13 @@ km:MR-REACT-CONVENTIONS-042 a km:SemanticMergeRequest ;
     km:reviewDoc ".km/mrs/mr-react-conventions-042.md" .
 ```
 
-*   **Agent isolation:** Proposal graphs are never merged into the canonical graph and are never visible to `validate_constraints` or default `query_semantic_graph` unions (which read from the workspace cache only).
+*   **Agent isolation:** Proposal graphs are never merged into the canonical graph and are never visible to `validate_constraints` or default `query_semantic_graph` unions.
 *   **Git export:** On every MR state change (propose, approve, reject), `{source}/exports/governance.ttl` is regenerated from the source governance graph.
-*   **Cache note:** The workspace cache (`.km/lo-cache/`) is **not** updated on propose — only on approve/reject, when exports change.
+*   **Cache sync:** On propose, workspace cache is not updated; on approve/reject, full cache rebuild from exports.
+
+**On propose**, after writing source graphs, `MergeRequestService` also:
+3.  Regenerates `{source}/exports/governance.ttl`.
+4.  Materializes derived review document at `.km/mrs/` and/or `km://mr/{ontology-id}/{mr-id}`.
 
 ### 7.2 Human Review Document (Derived View)
 The system also materializes a markdown review document in `.km/mrs/` (or exposes it as `km://mr/{ontology-id}/{mr-id}`) **generated from governance triples** for human readability. This document MUST contain two distinct sections:
@@ -783,7 +848,7 @@ approve <doc name>
 
 #### Examples of Developer Approval Prompts:
 *   `approve .km/mrs/mr-react-conventions-042.md`
-*   `approve km://mr/react-conventions/042`
+*   `approve km://mr/react-conventions/MR-042`
 
 #### The Approval & Merging Workflow
 When the agent detects the `approve <doc name>` prompt in the developer's message, it invokes the `approve_semantic_mr` MCP tool:
@@ -815,8 +880,7 @@ The server-side `MergeRequestService` (invoked by the `approve_semantic_mr` tool
 3.  **Merge** proposal quads from `http://km.local/learning-ontologies/{id}/mr/{mr-id}` into the source canonical graph, applying insertions and deletions.
 4.  **Update** governance triples in `{source}/lo_quads.db`: set `km:status "APPROVED"`, record `km:approvedAt` and `km:approver`.
 5.  **Regenerate** `{source}/exports/main.ttl` and `{source}/exports/governance.ttl` for Git commit in the LO repository.
-6.  **Refresh** the workspace cache at `.km/lo-cache/{ontology-id}/` from the updated exports and update `sync-manifest.json`.
+6.  **Refresh** the workspace cache (full rebuild from updated exports) and update `sync-manifest.json`.
 7.  **Reload** the in-memory canonical Learning Ontology cache from the refreshed workspace cache.
 
 *   **Result:** This workflow binds human review to a structured documentation standard while keeping LO source packages decoupled from the workspace. The developer uses a simple chat-native command (`approve <doc name>`), and the agent translates it into a typed MCP tool call that enforces secure semantic graph evolution. Agents continue validating against the updated canonical graph in the workspace cache only after reload.
-

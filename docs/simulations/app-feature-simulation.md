@@ -250,11 +250,11 @@ The agent registers a proposed exception for this specific class of events:
 ```json
 {
   "@id": "case:exceptions/ephemeral_coordinates_bypass",
-  "@type": "dist:LocalException",
-  "baking:bypassesShape": "dist:IdempotentMessageShape",
-  "baking:targetNode": "case:network/canvas_drag_event",
-  "baking:rationale": "High-frequency cursor coordinates (60Hz) are ephemeral. Absolute position is self-superseding, making duplicate protection redundant and computationally inefficient.",
-  "baking:status": "PENDING_HUMAN_APPROVAL"
+  "@type": "km:LocalException",
+  "km:bypassesShape": "dist:IdempotentMessageShape",
+  "km:targetNode": "case:network/canvas_drag_event",
+  "km:rationale": "High-frequency cursor coordinates (60Hz) are ephemeral. Absolute position is self-superseding, making duplicate protection redundant and computationally inefficient.",
+  "km:status": "PENDING_APPROVAL"
 }
 ```
 
