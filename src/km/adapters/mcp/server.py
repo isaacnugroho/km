@@ -134,6 +134,13 @@ def case_active_exceptions() -> str:
     return content
 
 
+@mcp.resource("km://case/active-exceptions/{exception_id}")
+def case_active_exception_item(exception_id: str) -> str:
+    uri = f"km://case/active-exceptions/{exception_id}"
+    content, _ = resource_handlers.read_resource(_get_app(), uri)
+    return content
+
+
 @mcp.resource("km://learning-ontologies/{ontology_id}/canonical")
 def lo_canonical(ontology_id: str) -> str:
     uri = f"km://learning-ontologies/{ontology_id}/canonical"

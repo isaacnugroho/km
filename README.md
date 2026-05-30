@@ -17,7 +17,17 @@ Phase 2 adds the case knowledge loop:
 - `km://case/active-graph` — Turtle serialization of the active branch graph
 - Case export pipeline with `on_write` policy (exports to `case-exports/graphs/`)
 
-Still stubbed: SHACL validation, exceptions, semantic MR, git watcher, `km export-case` CLI.
+## Phase 3 status
+
+Phase 3 adds constraint enforcement and exception workflow:
+
+- `validate_constraints` — SHACL validation against LO canonical shapes (incremental cache)
+- `propose_local_exception` / `approve_local_exception` — human-in-the-loop bypass
+- `km://schemas/learning-ontologies` — JSON-LD schema bundle for bound LOs
+- `km://case/active-exceptions` — pending and approved exceptions on active branch
+- Real `pending_exceptions_count` in `get_system_status`
+
+Still stubbed: semantic MR (Phase 4), git branch sync (Phase 5), `km export-case` CLI.
 
 ## Install
 
@@ -91,20 +101,20 @@ All logs go to **stderr** (safe for MCP stdio).
 pytest
 ```
 
-## MCP tools (Phase 1)
+## MCP tools
 
-| Tool | Phase 1 |
-|------|---------|
+| Tool | Status |
+|------|--------|
 | `get_system_status` | Implemented |
 | `ingest_case_facts` | Implemented |
-| `validate_constraints` | Stub |
-| `propose_local_exception` | Stub |
-| `approve_local_exception` | Stub |
 | `query_semantic_graph` | Implemented |
-| `propose_semantic_mr` | Stub |
-| `approve_semantic_mr` | Stub |
+| `validate_constraints` | Implemented |
+| `propose_local_exception` | Implemented |
+| `approve_local_exception` | Implemented |
+| `propose_semantic_mr` | Stub (Phase 4) |
+| `approve_semantic_mr` | Stub (Phase 4) |
 
-Resource `km://case/active-graph` is also implemented (Phase 2).
+Resources: `km://case/active-graph`, `km://case/active-exceptions`, and `km://schemas/learning-ontologies` are implemented. LO canonical/governance and MR resources remain stubs (Phase 4).
 
 ## CLI commands
 

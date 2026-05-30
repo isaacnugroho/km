@@ -3,16 +3,18 @@
 from __future__ import annotations
 
 import time
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from km.application.services.case_export_service import CaseExportService
 from km.exceptions import KmError
 from km.infrastructure.config.models import ExportPolicy, WorkspaceConfig
 from km.infrastructure.git.context import GitContext
-from km.infrastructure.rdf.graph_hash import hash_graph_quads
 from km.infrastructure.rdf.parse import parse_facts
 from km.infrastructure.rdf.store import QuadStoreWrapper
 from km.logging_config import get_logger
+
+if TYPE_CHECKING:
+    from km.application.services.validation_service import ValidationService
 
 logger = get_logger("case_ingest")
 
@@ -23,11 +25,12 @@ class CaseIngestService:
         case_wrapper: QuadStoreWrapper,
         export_service: CaseExportService,
         config: WorkspaceConfig,
+        validation_service: ValidationService | None = None,
     ) -> None:
         self.case_wrapper = case_wrapper
         self.export_service = export_service
         self.config = config
-        self._validation_hashes: dict[str, str] = {}
+        self.validation_service = validation_service
 
     def ingest(
         self,
@@ -49,7 +52,8 @@ class CaseIngestService:
             return {"status": "error", "triples_added": 0}
 
         added = self.case_wrapper.add_quads(quads)
-        self._invalidate_validation_cache(git_context.graph_uri)
+        if self.validation_service:
+            self.validation_service.invalidate(git_context.graph_uri)
 
         policy = self.config.case_exports.export_policy
         if policy == ExportPolicy.ON_WRITE:
@@ -66,10 +70,6 @@ class CaseIngestService:
             elapsed_ms,
         )
         return {"status": "success", "triples_added": added}
-
-    def _invalidate_validation_cache(self, graph_uri: str) -> None:
-        store = self.case_wrapper.store
-        self._validation_hashes[graph_uri] = hash_graph_quads(store, graph_uri)
 
     def serialize_active_graph(self, git_context: GitContext) -> str:
         return self.case_wrapper.serialize_graph(git_context.graph_uri)

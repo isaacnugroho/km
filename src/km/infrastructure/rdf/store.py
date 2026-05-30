@@ -144,9 +144,15 @@ class QuadStoreWrapper:
 
     def query(self, sparql: str) -> list[dict[str, str | None]]:
         results: list[dict[str, str | None]] = []
-        for row in self.store.query(sparql):
-            if hasattr(row, "items"):
-                results.append({k: _term_to_str(v) for k, v in row.items()})
+        solution = self.store.query(sparql)
+        if isinstance(solution, bool):
+            return results
+        variables = [
+            var.value if hasattr(var, "value") else str(var).removeprefix("?")
+            for var in solution.variables
+        ]
+        for row in solution:
+            results.append({var: _term_to_str(row[var]) for var in variables})
         return results
 
     def ask(self, sparql: str) -> bool:
@@ -195,8 +201,6 @@ class QuadStoreWrapper:
 def _term_to_str(term: object) -> str | None:
     if term is None:
         return None
-    if isinstance(term, Literal):
-        return str(term)
-    if isinstance(term, NamedNode):
-        return str(term)
+    if isinstance(term, (Literal, NamedNode, BlankNode)):
+        return term.value
     return str(term)

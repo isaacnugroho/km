@@ -8,11 +8,15 @@ from pathlib import Path
 from km.application.services.case_export_service import CaseExportService
 from km.application.services.case_ingest_service import CaseIngestService
 from km.application.services.case_store_service import CaseStoreService
+from km.application.services.exception_service import ExceptionService
 from km.application.services.lo_cache_service import LOCacheService
 from km.application.services.query_service import QueryService
+from km.application.services.schema_service import SchemaService
 from km.application.services.status_service import StatusService, SystemStatus
+from km.application.services.validation_service import ValidationService
 from km.application.services.workspace_service import WorkspaceService, discover_workspace_root
 from km.infrastructure.git.context import GitContext, read_git_context
+from km.infrastructure.rdf.shacl_cache import ShaclCache
 from km.logging_config import get_logger
 
 logger = get_logger("bootstrap")
@@ -29,6 +33,10 @@ class KMApplication:
     case_export: CaseExportService
     case_ingest: CaseIngestService
     query: QueryService
+    shacl_cache: ShaclCache
+    validation: ValidationService
+    exceptions: ExceptionService
+    schemas: SchemaService
 
     @classmethod
     def bootstrap(cls, workspace_root: Path | None = None) -> KMApplication:
@@ -49,6 +57,7 @@ class KMApplication:
             binding_data.append((binding, lo_config, source_path))
 
         lo_cache.sync_all(binding_data)
+        shacl_cache = ShaclCache.compile_from_lo_entries(lo_cache.entries)
 
         case_db = workspace.resolve_config_path(workspace.config.quad_store.storage_path)
         exports_root = workspace.resolve_config_path(workspace.config.case_exports.base_path)
@@ -58,8 +67,11 @@ class KMApplication:
         git_context = read_git_context(root)
 
         case_export = CaseExportService(exports_root, case_wrapper)
-        case_ingest = CaseIngestService(case_wrapper, case_export, workspace.config)
+        validation = ValidationService(case_wrapper, shacl_cache)
+        case_ingest = CaseIngestService(case_wrapper, case_export, workspace.config, validation)
         query = QueryService(case_wrapper, lo_cache.entries, git_context)
+        exceptions = ExceptionService(case_wrapper, case_export, validation)
+        schemas = SchemaService(lo_cache.entries)
 
         app = cls(
             workspace_root=root,
@@ -71,6 +83,10 @@ class KMApplication:
             case_export=case_export,
             case_ingest=case_ingest,
             query=query,
+            shacl_cache=shacl_cache,
+            validation=validation,
+            exceptions=exceptions,
+            schemas=schemas,
         )
         logger.info("KM bootstrap complete")
         return app
@@ -80,6 +96,7 @@ class KMApplication:
             self.workspace.config,
             self.git_context,
             self.lo_cache.entries,
+            self.exceptions,
         )
 
     def shutdown(self) -> None:

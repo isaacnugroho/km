@@ -27,7 +27,7 @@ def handle_ingest_case_facts(app: KMApplication, facts: str, format: str = "json
 
 def handle_validate_constraints(app: KMApplication) -> dict[str, Any]:
     require_implemented("validate_constraints")
-    return {"conforms": True, "violations": []}
+    return app.validation.validate_constraints(app.git_context)
 
 
 def handle_propose_local_exception(
@@ -37,7 +37,7 @@ def handle_propose_local_exception(
     rationale: str,
 ) -> dict[str, Any]:
     require_implemented("propose_local_exception")
-    return {"exception_id": "", "status": "PENDING_APPROVAL"}
+    return app.exceptions.propose(bypasses_shape, target_node, rationale, app.git_context)
 
 
 def handle_approve_local_exception(
@@ -47,7 +47,7 @@ def handle_approve_local_exception(
     signature: str,
 ) -> dict[str, Any]:
     require_implemented("approve_local_exception")
-    return {"status": "APPROVED", "timestamp": ""}
+    return app.exceptions.approve(exception_id, approver, signature, app.git_context)
 
 
 def handle_query_semantic_graph(app: KMApplication, query: str) -> dict[str, Any]:

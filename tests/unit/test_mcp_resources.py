@@ -15,8 +15,6 @@ from tests.fixtures_data import SAMPLE_CASE_TURTLE
 @pytest.mark.parametrize(
     "uri",
     [
-        "km://schemas/learning-ontologies",
-        "km://case/active-exceptions",
         "km://learning-ontologies/hexagonal-architecture/canonical",
         "km://learning-ontologies/hexagonal-architecture/governance",
         "km://mr/hexagonal-architecture/MR-001",
@@ -27,6 +25,16 @@ def test_resource_stubs_raise(tmp_workspace: Path, uri: str) -> None:
     try:
         with pytest.raises(FeatureNotImplementedError):
             resource_handlers.read_resource(app, uri)
+    finally:
+        app.shutdown()
+
+
+def test_schemas_resource_implemented(tmp_workspace: Path) -> None:
+    app = KMApplication.bootstrap(tmp_workspace)
+    try:
+        content, mime = resource_handlers.read_resource(app, "km://schemas/learning-ontologies")
+        assert mime == "application/ld+json"
+        assert "learning_ontologies" in content
     finally:
         app.shutdown()
 

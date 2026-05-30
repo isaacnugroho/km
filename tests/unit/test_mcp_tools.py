@@ -32,10 +32,20 @@ def test_handle_ingest_success(tmp_workspace: Path) -> None:
         app.shutdown()
 
 
-def test_handle_validate_stub(tmp_workspace: Path) -> None:
+def test_handle_validate_constraints(tmp_workspace: Path) -> None:
     app = KMApplication.bootstrap(tmp_workspace)
     try:
-        with pytest.raises(FeatureNotImplementedError, match="validate_constraints"):
-            mcp_tools.handle_validate_constraints(app)
+        result = mcp_tools.handle_validate_constraints(app)
+        assert result["conforms"] is True
+        assert result["violations"] == []
+    finally:
+        app.shutdown()
+
+
+def test_handle_propose_mr_stub(tmp_workspace: Path) -> None:
+    app = KMApplication.bootstrap(tmp_workspace)
+    try:
+        with pytest.raises(FeatureNotImplementedError, match="propose_semantic_mr"):
+            mcp_tools.handle_propose_semantic_mr(app, "x", "r", "t")
     finally:
         app.shutdown()

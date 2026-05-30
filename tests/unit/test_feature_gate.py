@@ -12,13 +12,11 @@ from km.exceptions import FeatureNotImplementedError
 @pytest.mark.parametrize(
     "feature",
     [
-        "validate_constraints",
-        "propose_local_exception",
-        "approve_local_exception",
         "propose_semantic_mr",
         "approve_semantic_mr",
-        "resource:schemas/learning-ontologies",
-        "resource:case/active-exceptions",
+        "resource:lo/canonical",
+        "resource:lo/governance",
+        "resource:mr",
         "cli:export-case",
     ],
 )
@@ -35,6 +33,14 @@ def test_phase2_features_implemented() -> None:
     require_implemented("ingest_case_facts")
     require_implemented("query_semantic_graph")
     require_implemented("resource:case/active-graph")
+
+
+def test_phase3_features_implemented() -> None:
+    require_implemented("validate_constraints")
+    require_implemented("propose_local_exception")
+    require_implemented("approve_local_exception")
+    require_implemented("resource:schemas/learning-ontologies")
+    require_implemented("resource:case/active-exceptions")
 
 
 def test_release_enables_feature() -> None:

@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from km.application.services.lo_cache_service import LOCacheEntry
 from km.infrastructure.config.models import WorkspaceConfig
 from km.infrastructure.git.context import GitContext
 from km.logging_config import get_logger
+
+if TYPE_CHECKING:
+    from km.application.services.exception_service import ExceptionService
 
 logger = get_logger("status")
 
@@ -37,6 +40,7 @@ class StatusService:
         config: WorkspaceConfig,
         git_context: GitContext,
         cache_entries: list[LOCacheEntry],
+        exception_service: ExceptionService | None = None,
     ) -> SystemStatus:
         lo_status: list[dict[str, Any]] = []
         for entry in cache_entries:
@@ -50,16 +54,21 @@ class StatusService:
                 }
             )
 
+        pending_exceptions = 0
+        if exception_service is not None:
+            pending_exceptions = exception_service.count_pending(git_context)
+
         status = SystemStatus(
             active_branch=git_context.branch_path,
             learning_ontologies=lo_status,
-            pending_exceptions_count=0,
+            pending_exceptions_count=pending_exceptions,
             pending_mrs_count=0,
             branch_merge_policy=config.branch_merge.policy.value,
         )
         logger.info(
-            "System status: branch=%s, ontologies=%d",
+            "System status: branch=%s, ontologies=%d, pending_exceptions=%d",
             status.active_branch,
             len(lo_status),
+            pending_exceptions,
         )
         return status
