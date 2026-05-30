@@ -15,27 +15,35 @@ graph TD
     subgraph LO [Learning Ontologies Layer: Global & Static]
         direction TB
         LO_Source["Source packages at arbitrary paths (source)"]
-        LO_Store["Source lo_quads.db + exports/ (Git-tracked exports)"]
+        LO_Store["Source lo_quads.db (Git ignored)"]
+        LO_Exports["exports/main.ttl + exports/governance/*.ttl"]
         LO_Canonical["Canonical Named Graph (approved state)"]
         LO_Governance["Governance Named Graph (MR lifecycle)"]
         LO_Source --> LO_Store
+        LO_Store <-->|export / import| LO_Exports
         LO_Store --> LO_Canonical
         LO_Store --> LO_Governance
     end
 
-    subgraph WS [Workspace .km/]
+    subgraph WS [Workspace .km/ runtime]
         LO_Cache["lo-cache/{id}/lo_quads.db"]
+        CO_DB["case_quads.db"]
     end
 
     subgraph CO [Case Ontology Layer: Local & Dynamic]
         direction TB
+        CO_Exports["case-exports/graphs/*.ttl + governance/*.ttl"]
         CO_BranchGraph["Named Graphs (Mapped 1:1 to Git branches)"]
         CO_Facts["Dynamic Case Facts (AST parses, runtime events)"]
         CO_Exceptions["Approved Local Exceptions (Human-signed)"]
+        CO_DB <-->|export / import| CO_Exports
+        CO_DB --> CO_BranchGraph
+        CO_DB --> CO_Facts
+        CO_DB --> CO_Exceptions
     end
 
     LO_Source -->|Sync exports on startup| LO_Cache
-    LO_Cache -->|Read-Only Import| CO
+    LO_Cache -->|Read-Only Import| CO_DB
     CO_Exceptions -.->|Bypass Constraints| LO_Cache
 
     style LO fill:#1a233a,stroke:#3b82f6,stroke-width:2px,color:#fff
@@ -55,10 +63,13 @@ Learning Ontologies represent version-controlled repositories of structured, dom
 *   **Properties:** Read-only for the agent during execution. Pending MR proposal graphs are invisible to validation and default schema reads.
 
 ### 1.2 The Case Ontology (Local Workspace)
-The Case Ontology models the dynamic, situational reality of the active workspace.
-*   **Storage Location:** Contained in the local workspace inside the `.km/` directory.
-*   **Structure:** Implemented as an RDF Quad-Store to support Named Graphs mapped 1:1 to Git branches.
-*   **Lifecycle:** Dynamically updated by the agent at runtime (e.g., AST parse results, process flow discoveries). Bypasses global rules only via structured local exceptions signed off by the developer.
+The Case Ontology models the dynamic, situational reality of the active workspace. It follows the **same export authority model** as Learning Ontologies (see §2.6): runtime state in a Git-ignored quad-store; Git-tracked Turtle exports for review and audit.
+*   **Runtime storage:** `.km/case_quads.db` (Git ignored).
+*   **Git authority:** `case-exports/` at the workspace root (sibling to `.km/`), containing per-branch graph files and per-event governance shards.
+*   **Structure:** Implemented as an RDF Quad-Store with Named Graphs mapped 1:1 to Git branches:
+    *   **Branch graphs** — `http://km.local/graphs/{branch-path}`: dynamic case facts and approved `km:LocalException` triples for that branch.
+    *   **Workspace governance graph** — `http://km.local/case/governance`: branch-merge resolutions and other workspace-level audit records (exported under `case-exports/governance/`).
+*   **Lifecycle:** Dynamically updated by the agent at runtime (e.g., AST parse results, process flow discoveries). Bypasses global rules only via structured local exceptions signed off by the developer. Export writes follow `case_exports.export_policy` in `.km/config.json` (see §2.6).
 
 ---
 
@@ -72,10 +83,17 @@ workspace-root/
 ├── .git/                        # Active repository indicators
 │   ├── HEAD                     # Branch tracking reference
 │   └── refs/                    # Branch refs tracking
-├── .km/                         # Local KM Workspace directory (Git ignored)
+├── case-exports/                # Case ontology Git authority (tracked)
+│   ├── graphs/
+│   │   ├── refs-heads-main.ttl
+│   │   └── refs-heads-feature-collaborative-canvas.ttl
+│   ├── governance/
+│   │   └── merge-feature-collaborative-canvas-20260530.ttl
+│   └── sync-manifest.json       # Per-file checksums for case export bootstrap
+├── .km/                         # Local KM runtime directory (Git ignored)
 │   ├── config.json              # Workspace-specific configuration & LO bindings
-│   ├── case_quads.db            # Case ontology quad-store
-│   ├── lo-cache/                # Materialized LO runtime caches (Git ignored)
+│   ├── case_quads.db            # Case ontology runtime quad-store
+│   ├── lo-cache/                # Materialized LO runtime caches
 │   │   └── {ontology-id}/
 │   │       ├── lo_quads.db      # Synced runtime quad-store for this binding
 │   │       └── sync-manifest.json  # Source path, export checksums, last sync time
@@ -92,7 +110,8 @@ Learning Ontology **source packages** live at arbitrary paths referenced by bind
 ├── lo_quads.db                  # Runtime quad-store in source repo (Git ignored)
 └── exports/
     ├── main.ttl                 # Canonical graph export (Git tracked)
-    └── governance.ttl           # MR governance export (Git tracked)
+    └── governance/              # One Turtle file per MR record (Git tracked)
+        └── MR-REACT-CONVENTIONS-042.ttl
 ```
 
 ### 2.2 Workspace Configuration (`.km/config.json`)
@@ -119,9 +138,38 @@ The configuration defines workspace identification, **Learning Ontology bindings
   },
   "lo_cache": {
     "base_path": "./.km/lo-cache"
+  },
+  "case_exports": {
+    "base_path": "./case-exports",
+    "export_policy": "on_commit"
+  },
+  "branch_merge": {
+    "policy": "auto_merge_exception"
   }
 }
 ```
+
+#### Case Export Policy (`case_exports.export_policy`)
+Controls when the daemon writes Git-authoritative Case export files (see §2.6).
+
+| Config value | Behavior                                                                                                                                                                                     |
+| :----------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `on_commit`  | **Default (recommended).** Export active branch graph and pending governance on `git commit` (hook) or explicit `km export-case`. Avoids rewriting graph files on every `ingest_case_facts`. |
+| `on_write`   | Upsert `case-exports/graphs/{ref}.ttl` after each mutating Case MCP tool (higher churn; use only for small workspaces).                                                                      |
+| `manual`     | Export only when the developer runs `km export-case`.                                                                                                                                        |
+
+Omitting `case_exports` is equivalent to `"base_path": "./case-exports"` and `"export_policy": "on_commit"`.
+
+#### Branch Merge Policy (`branch_merge.policy`)
+Controls Case Ontology graph synchronization when Git detects that a feature branch was merged into the active branch (see §5.3).
+
+| Config value           | Display name         | Default | Behavior                                                                                                                                                                        |
+| :--------------------- | :------------------- | :------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `no_auto_merge`        | NO AUTO MERGE        |         | Halt and prompt the developer with `MERGE`, `KEEP ISOLATED`, or `DELETE` options for the entire source branch graph.                                                            |
+| `auto_merge`           | AUTO MERGE           |         | Automatically import all Case facts and approved exceptions from the source branch graph into the target branch graph; no prompt.                                               |
+| `auto_merge_exception` | AUTO MERGE EXCEPTION | **Yes** | Automatically import **approved exceptions only** (including rationale and approval metadata) into the target branch graph; then prompt for resolution of remaining Case facts. |
+
+Omitting `branch_merge` is equivalent to `"policy": "auto_merge_exception"`.
 
 #### Learning Ontology Binding Schema
 Each entry in `learning_ontologies` is an object:
@@ -161,10 +209,10 @@ On MCP server startup, for each binding:
 
 **Empty governance bootstrap**
 
-If `{source}/exports/governance.ttl` is absent (new LO package), treat it as an empty governance graph: create the file with a minimal header comment, or import zero triples. Cache sync MUST NOT fail on missing governance export; record `"governance.ttl": null` in `export_checksums` until the first MR is proposed.
+If `{source}/exports/governance/` is absent or empty (new LO package), treat governance as an empty graph. Cache sync MUST NOT fail on missing governance exports; record `"governance": {}` in `export_checksums` until the first MR is proposed.
 
-2.  **Compare** export checksums in `sync-manifest.json` against `{source}/exports/main.ttl` and `governance.ttl` (when present).
-3.  **Rebuild cache** if the manifest is absent, checksums differ, or `lo_quads.db` is missing — import exports into `.km/lo-cache/{ontology-id}/lo_quads.db`.
+2.  **Compare** export checksums in `sync-manifest.json` against `{source}/exports/main.ttl` and every file under `{source}/exports/governance/*.ttl`.
+3.  **Rebuild cache** if the manifest is absent, checksums differ, or `lo_quads.db` is missing — import `main.ttl` and all `governance/*.ttl` into `.km/lo-cache/{ontology-id}/lo_quads.db`.
 4.  **Load canonical** graphs from the cache into the in-memory schema cache.
 
 #### `sync-manifest.json` Example
@@ -176,7 +224,9 @@ If `{source}/exports/governance.ttl` is absent (new LO package), treat it as an 
   "synced_at": "2026-05-30T08:00:00Z",
   "export_checksums": {
     "main.ttl": "sha256:a1b2c3…",
-    "governance.ttl": "sha256:d4e5f6…"
+    "governance": {
+      "MR-REACT-CONVENTIONS-042.ttl": "sha256:d4e5f6…"
+    }
   }
 }
 ```
@@ -198,8 +248,8 @@ If `{source}/exports/governance.ttl` is absent (new LO package), treat it as an 
 | `propose_semantic_mr` / `approve_semantic_mr` writes   | **Source** `{source}/lo_quads.db`               | Then sync exports and refresh cache (see below)               |
 
 **Cache refresh on MR lifecycle:**
-1. **On propose:** Regenerate `{source}/exports/governance.ttl`; cache is not updated. Canonical cache unchanged.
-2. **On approve/reject:** Regenerate both exports; **full cache rebuild** from exports; reload in-memory canonical cache.
+1. **On propose:** Upsert `{source}/exports/governance/{mr-id}.ttl` for the MR record; cache is not updated. Canonical cache unchanged.
+2. **On approve/reject:** Regenerate `{source}/exports/main.ttl`; update the MR's governance shard; **full cache rebuild** from exports; reload in-memory canonical cache.
 
 *   **Curator writes** (MR propose/approve) target the **source** LO package's `lo_quads.db` and regenerate `{source}/exports/`. On **propose**, the workspace cache is not updated; on **approve/reject**, the cache is fully rebuilt from exports (see above).
 
@@ -213,7 +263,8 @@ Each LO source package is self-contained regardless of where it lives on disk.
 ├── lo_quads.db                  # Runtime quad-store in source repo (Git ignored)
 └── exports/
     ├── main.ttl                 # Serialized canonical graph (Git tracked)
-    └── governance.ttl           # Serialized MR governance graph (Git tracked)
+    └── governance/              # One file per MR governance record (Git tracked)
+        └── {mr-id}.ttl
 ```
 
 #### Per-Ontology Configuration (`{source}/config.json`)
@@ -252,10 +303,81 @@ The `ontology_id` in `{source}/config.json` MUST match the `ontology_id` in the 
 | **Workspace cache** | `.km/lo-cache/{ontology-id}/lo_quads.db` | Rebuilt from `{source}/exports/` on startup when manifest absent or checksums differ; full rebuild on MR approve/reject |
 | **Source package**  | `{source}/lo_quads.db`                   | Rebuilt from `{source}/exports/` when opened for curator writes if absent or stale; not used for agent reads            |
 
-Both stores are runtime-only and Git-ignored. Git authority remains `{source}/exports/main.ttl` and `{source}/exports/governance.ttl`.
+Both stores are runtime-only and Git-ignored. Git authority remains `{source}/exports/main.ttl` and `{source}/exports/governance/*.ttl`.
 
 *   **`exports/main.ttl`** is the Git-authoritative snapshot of the canonical graph, suitable for human diff review in pull requests.
-*   **`exports/governance.ttl`** is the Git-authoritative snapshot of all MR records (pending, approved, rejected).
+*   **`exports/governance/{mr-id}.ttl`** holds one MR's governance triples (pending, approved, or rejected). Upserting per MR minimizes merge conflicts versus regenerating a monolithic governance file.
+
+### 2.6 Case Export Package
+The workspace Case Ontology uses the same **runtime vs export** split as LO source packages (§2.4–2.5), but exports live in the **application repository** under `case-exports/` rather than an external LO package.
+
+#### Directory layout
+```
+case-exports/
+├── graphs/
+│   └── {sanitized-ref}.ttl      # One file per Git ref; one GRAPH block per file
+├── governance/
+│   └── {event-id}.ttl           # Branch-merge resolutions and workspace audit
+└── sync-manifest.json           # SHA-256 checksums for bootstrap
+```
+
+#### Git ref → filename mapping
+Sanitize the full ref path for a stable filename:
+
+| Git ref                                   | Export file                                          |
+| :---------------------------------------- | :--------------------------------------------------- |
+| `refs/heads/main`                         | `graphs/refs-heads-main.ttl`                         |
+| `refs/heads/feature/collaborative-canvas` | `graphs/refs-heads-feature-collaborative-canvas.ttl` |
+
+Rules: replace `/` with `-`; prefix with `refs-heads-` (or `refs-` for non-head refs). The `GRAPH` URI inside the file MUST be `http://km.local/graphs/{branch-path}` where `{branch-path}` is the path after `refs/heads/` (e.g. `feature/collaborative-canvas`).
+
+#### Turtle serialization (same rules as LO exports)
+*   Each graph file contains exactly one `GRAPH <uri> { ... }` block.
+*   Triples inside the block are sorted by `(subject, predicate, object)` with normalized literals for deterministic diffs.
+*   Shared `@prefix` declarations appear at the top of each file; domain prefixes are included only when used.
+
+#### Bootstrap from exports
+On MCP startup (or when `case_quads.db` is missing/stale):
+1.  Compare `case-exports/sync-manifest.json` checksums against `graphs/*.ttl` and `governance/*.ttl`.
+2.  Import all export files into `.km/case_quads.db`, mapping each `GRAPH` block to its named graph URI.
+3.  If the DB is authoritative and exports are stale, the daemon MAY warn; default for a fresh clone is **exports → DB**.
+
+#### Export write rules
+| Event                                                 | Export action                                                                                          |
+| :---------------------------------------------------- | :----------------------------------------------------------------------------------------------------- |
+| `ingest_case_facts`                                   | Per `export_policy`: upsert active branch `graphs/{ref}.ttl`, or defer until commit                    |
+| `propose_local_exception` / `approve_local_exception` | Upsert active branch graph file (exceptions live in branch graph per §6.1)                             |
+| §5.3 merge resolution                                 | Upsert target branch graph file(s); create `governance/{event-id}.ttl` with `km:BranchMergeResolution` |
+| §5.2 branch inheritance (optional)                    | After clone-on-write in DB, export new branch graph file from parent snapshot                          |
+
+#### Case Named Graph Registry
+```
+┌────────────────────────────────────────────────────────┬──────────────────────────────────────────┐
+│ Named Graph URI                                        │ Git / export mapping                     │
+├────────────────────────────────────────────────────────┼──────────────────────────────────────────┤
+│ http://km.local/graphs/{branch-path}                 │ case-exports/graphs/{sanitized-ref}.ttl  │
+│ http://km.local/case/governance                      │ case-exports/governance/*.ttl            │
+└────────────────────────────────────────────────────────┴──────────────────────────────────────────┘
+```
+
+#### `km:BranchMergeResolution` (governance export)
+Written to `case-exports/governance/{event-id}.ttl` when the developer completes §5.3 merge resolution:
+
+```turtle
+@prefix km: <http://km.local/governance#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+GRAPH <http://km.local/case/governance> {
+    km:merge-feature-canvas-20260530 a km:BranchMergeResolution ;
+        km:sourceGraph <http://km.local/graphs/feature/collaborative-canvas> ;
+        km:targetGraph <http://km.local/graphs/main> ;
+        km:resolution "MERGE" ;
+        km:policy "auto_merge_exception" ;
+        km:exceptionsCopied 1 ;
+        km:triplesImported 42 ;
+        km:recordedAt "2026-05-30T14:22:01Z"^^xsd:dateTime .
+}
+```
 
 ---
 
@@ -289,7 +411,7 @@ graph TD
     style Init fill:#1e1b29,stroke:#8b5cf6,stroke-width:2px,color:#fff
 ```
 *   **Cache-First Reads:** All agent validation and query operations read from `.km/lo-cache/{ontology-id}/lo_quads.db`, not from `{source}/lo_quads.db` directly.
-*   **Bootstrap from Exports:** If a cache `lo_quads.db` is missing or stale (checksum mismatch), the daemon imports `{source}/exports/main.ttl` and `governance.ttl` into the cache before serving requests.
+*   **Bootstrap from Exports:** If a cache `lo_quads.db` is missing or stale (checksum mismatch), the daemon imports `{source}/exports/main.ttl` and all `exports/governance/*.ttl` into the cache before serving requests. Case store bootstrap imports `case-exports/graphs/*.ttl` and `case-exports/governance/*.ttl` per §2.6.
 *   **Static Loading:** Canonical graphs and SHACL shapes are loaded and cached in-memory *exactly once* during MCP server startup. Governance and pending MR proposal graphs are loaded on demand for curator workflows only.
 *   **Post-MR Cache Refresh:** On propose, source exports are updated but the workspace cache is not. On approve/reject, full cache rebuild from exports and reload in-memory canonical cache.
 *   **Parsing Bypass:** Future validations bypass the standard RDF graph parsing phase (`rdflib.Graph().parse()`), reducing validation startup time from ~150ms to <1ms.
@@ -306,7 +428,7 @@ Running a comprehensive SHACL validation (`pyshacl`) on large graphs on every in
 1.  **State Hash Checking:** The active Case Named Graph is hashed on update.
 2.  **Dirty-Flag Logic:** If the state hash matches the previous validation run, the validation step is bypassed entirely, returning the cached validation report immediately (0ms overhead).
 3.  **Scoped Validation Execution:** When validation is triggered, the validator operates strictly on the active Case Graph merged with the pre-compiled, cached **canonical** LO shapes only. Pending MR proposal graphs are never included.
-4.  **Local Exception Short-Circuiting:** Approved exceptions are registered directly into the active named graph as triples. The validation engine matches these exceptions during the evaluation phase, eliminating the need to process external exception tables.
+4.  **Local Exception Short-Circuiting:** Approved exceptions are registered directly into the active named graph as triples. The validation engine matches these exceptions during the evaluation phase, eliminating the need to process external exception tables. Because exceptions live in branch-scoped graphs, branch merge resolution must account for them explicitly — see §5.3 and `branch_merge.policy`.
 
 ### 3.5 Latency Performance Budget
 | Operation Type          | Tech Stack Component      | Direct Target Latency | Max Bound Latency | Optimization Method                              |
@@ -324,8 +446,24 @@ The KM MCP Server exposes a standard interface enabling reading, writing, valida
 
 ### 4.1 MCP Tools Specification
 
+#### Export side effects (Case and LO)
+Mutating tools write to the runtime quad-store first, then update Git-authoritative exports:
+
+| Tool                           | Runtime store          | Export side effect                                                                    |
+| :----------------------------- | :--------------------- | :------------------------------------------------------------------------------------ |
+| `ingest_case_facts`            | `.km/case_quads.db`    | Upsert `case-exports/graphs/{active-ref}.ttl` per `case_exports.export_policy` (§2.6) |
+| `propose_local_exception`      | `.km/case_quads.db`    | Upsert active branch graph file                                                       |
+| `approve_local_exception`      | `.km/case_quads.db`    | Upsert active branch graph file                                                       |
+| Branch merge resolver (daemon) | `.km/case_quads.db`    | Upsert affected graph files; create `case-exports/governance/{event-id}.ttl`          |
+| `propose_semantic_mr`          | `{source}/lo_quads.db` | Upsert `{source}/exports/governance/{mr-id}.ttl`                                      |
+| `approve_semantic_mr` / reject | `{source}/lo_quads.db` | Regenerate `{source}/exports/main.ttl`; update MR governance shard                    |
+
+Agents MUST NOT hand-edit export files; exports are derived from the store by the daemon.
+
 #### 1. `ingest_case_facts`
 Ingests dynamic facts, relationships, and concepts discovered during the active workspace case into the named graph corresponding to the active branch.
+
+**Export:** Updates `case-exports/graphs/{sanitized-ref}.ttl` for the active Git ref when `export_policy` is `on_write`, or defers export until commit/`km export-case` when `on_commit` (default).
 *   **Parameters Schema:**
     ```json
     {
@@ -407,8 +545,12 @@ Approval command: `approve km://case/active-exceptions/{exception-id}`.
     }
     ```
 
+**Export:** Upserts the active branch graph file in `case-exports/graphs/` (exception triples remain in the branch graph).
+
 #### 4. `approve_local_exception`
 Registers the developer's approval signature and timestamp, enabling the SHACL validator to bypass the constraint.
+
+**Export:** Upserts the active branch graph file after approval metadata is written.
 *   **Parameters Schema:**
     ```json
     {
@@ -463,6 +605,8 @@ Executes a read-only SPARQL query over the active Case named graph and **canonic
 
 #### 6. `propose_semantic_mr`
 Initiates a Merge Request to promote locally discovered patterns from the Case Ontology into a global Learning Ontology. Requires `mode: "curator"` on the target binding. Writes proposal quads to the **source** LO's `mr/{mr-id}` graph and MR metadata to the source governance graph; generates a human-review markdown view under `.km/mrs/` (derived, not authoritative).
+
+**Export:** Upserts `{source}/exports/governance/{mr-id}.ttl` after writing the source store.
 
 The `target_ontology` parameter accepts either:
 1. **`base_uri`** — matches `{source}/config.json` → `base_uri` (e.g. `http://ontologies.react.org/core`), or
@@ -521,14 +665,15 @@ Returns environmental and memory states of the KM daemon.
           }
         },
         "pending_exceptions_count": { "type": "integer" },
-        "pending_mrs_count": { "type": "integer", "description": "Count of km:status PENDING_APPROVAL in source governance graphs" }
+        "pending_mrs_count": { "type": "integer", "description": "Count of km:status PENDING_APPROVAL in source governance graphs" },
+        "branch_merge_policy": { "type": "string", "enum": ["no_auto_merge", "auto_merge", "auto_merge_exception"], "description": "Effective branch_merge.policy from config (default auto_merge_exception)" }
       },
-      "required": ["active_branch", "learning_ontologies", "pending_exceptions_count", "pending_mrs_count"]
+      "required": ["active_branch", "learning_ontologies", "pending_exceptions_count", "pending_mrs_count", "branch_merge_policy"]
     }
     ```
 
 #### 8. `approve_semantic_mr`
-Records human approval of a pending semantic Merge Request. Requires `mode: "curator"` on the target binding. Merges proposal quads into the **source** LO canonical graph, updates governance triples in the source store, regenerates `{source}/exports/main.ttl` and `exports/governance.ttl`, refreshes the workspace cache at `.km/lo-cache/{ontology-id}/`, and reloads the in-memory LO cache. The agent invokes this tool after the developer issues the `approve <doc name>` command in chat.
+Records human approval of a pending semantic Merge Request. Requires `mode: "curator"` on the target binding. Merges proposal quads into the **source** LO canonical graph, updates governance triples in the source store, regenerates `{source}/exports/main.ttl`, upserts `{source}/exports/governance/{mr-id}.ttl`, refreshes the workspace cache at `.km/lo-cache/{ontology-id}/`, and reloads the in-memory LO cache. The agent invokes this tool after the developer issues the `approve <doc name>` command in chat.
 *   **Parameters Schema:**
     ```json
     {
@@ -566,8 +711,9 @@ Resources allow the client agent to perform bulk reads of schema metadata and ac
     *   **Description:** Retrieves a unified schema metadata document listing classes, properties, and documentation for all globally imported Learning Ontologies, sourced from **canonical graphs only**.
     *   **Format:** `application/ld+json`
 2.  **`km://case/active-graph`**
-    *   **Description:** Returns the complete, raw serialized RDF graph mapping the active branch's current Case facts.
+    *   **Description:** Returns the complete, raw serialized RDF graph mapping the active branch's current Case facts from the **runtime** store (`.km/case_quads.db`).
     *   **Format:** `text/turtle`
+    *   **Git review:** For pull-request diffs, use `case-exports/graphs/{sanitized-active-ref}.ttl` (§2.6).
 3.  **`km://case/active-exceptions`**
     *   **Description:** Retrieves all local exceptions (pending and approved) currently declared within the active workspace branch scope.
     *   **Format:** `application/json`
@@ -594,7 +740,7 @@ The developer approval command is: `approve km://case/active-exceptions/{excepti
 
 ## 5. Version Control & Git Synchronization Dynamics
 
-Since the Case Ontology structures its facts inside a local database rather than checking raw triples into Git, the KM MCP employs a **Git Branch Watcher** to align the semantic graph context seamlessly with the repository state.
+Both Learning Ontologies and the Case Ontology use the same **runtime vs export** pattern: Git-ignored quad-stores for MCP performance; Git-tracked Turtle exports for human review and audit (LO: `{source}/exports/`; Case: `case-exports/`). The KM MCP employs a **Git Branch Watcher** to align Case named-graph scope with repository branch state while keeping export files in sync per §2.6.
 
 ### 5.1 Branch Switch Detection Flow
 1.  **File Watcher Activation:** The KM Daemon actively watches `.git/HEAD` for state modifications using a zero-CPU event listener (`inotify` or `watchdog`).
@@ -622,15 +768,58 @@ When a developer switches to a newly initialized branch:
 *   The active graph context checks if the graph `http://km.local/graphs/feature/new-branch` contains triples.
 *   **Inheritance Mechanism:** If the graph is empty, the daemon checks the Git tracking information (using `git merge-base` or `.git/logs/HEAD`) to identify the direct parent branch (e.g. `main`).
 *   **Clone-on-Write Copying:** The daemon copy-clones all triples from the parent's named graph (`http://km.local/graphs/main`) into the new branch's named graph, providing the agent with immediate architectural and process contextual memories from the parent branch.
+*   **Export (optional):** After inheritance, the daemon MAY write `case-exports/graphs/{sanitized-new-ref}.ttl` from the cloned graph so the new branch's export exists before the first ingest.
 
 ### 5.3 Branch Merging Logic
 When branch `feature-a` is merged into the active branch (e.g., `main`):
 *   The daemon detects updates in `.git/refs/heads/main` or `.git/refs/heads/feature-a`.
-*   **No Auto-Merge Safety:** To prevent garbage-in, garbage-out data pollution (importing buggy, intermediate experimental facts), the system **does not automatically merge the named graphs**.
-*   **Developer Warning and Options:** The system flags a warning to the developer, prompting an explicit resolution action:
-    1.  `MERGE`: Import the finalized, validated Case facts and approved exceptions into `main`'s named graph.
-    2.  `KEEP ISOLATED`: Do not synchronize graph states; preserve the feature graph independently.
-    3.  `DELETE`: Discard the feature graph completely to maintain a clean database state.
+
+#### Approved Exception Persistence Risk
+Approved local exceptions (`km:LocalException` with `km:status "APPROVED"`) are registered directly as triples in the **source branch's** Case named graph (see §3.4, §6.1), including `km:rationale`, `km:approvedBy`, and `km:signature`. They are not stored in a separate exception table.
+
+If the developer selects `DELETE` during merge resolution under a policy that has not yet copied those triples to the target branch, those triples are **removed from the runtime** `.km/case_quads.db` on the source branch graph. **Git audit** for exceptions and merge decisions is preserved when `case-exports/` is committed: branch graph files snapshot pre-merge state, and `case-exports/governance/{event-id}.ttl` records the resolution. Without committed exports, recovery requires a `.km` backup or LO-level promotion history — same risk as before for unexported runtime-only state.
+
+#### Merge Policy (`branch_merge.policy`)
+Behavior is controlled by `.km/config.json` → `branch_merge.policy` (see §2.2). Three policies are supported:
+
+| Policy                   | Config value           | Post-merge behavior                                                                                                                                                                                              |
+| :----------------------- | :--------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **NO AUTO MERGE**        | `no_auto_merge`        | Halt and prompt the developer with explicit resolution options for the **entire** source branch graph (see below). The prompt MUST warn when approved exceptions would be lost if `DELETE` is chosen.            |
+| **AUTO MERGE**           | `auto_merge`           | Automatically import all Case facts **and** approved exceptions from the source branch graph into the target branch graph. No developer prompt.                                                                  |
+| **AUTO MERGE EXCEPTION** | `auto_merge_exception` | **Default.** Automatically import approved exceptions (and their rationale/approval metadata) into the target branch graph **first**; then prompt the developer for resolution of **remaining** Case facts only. |
+
+#### Developer Resolution Options (when prompted)
+When a policy requires developer input (`no_auto_merge`, or `auto_merge_exception` after exception auto-merge), the system flags a warning and offers:
+
+1.  **`MERGE`:** Import the remaining Case facts from the source branch graph into the target branch graph. Approved exceptions are included when using `no_auto_merge`; they are already present on the target when using `auto_merge_exception`.
+2.  **`KEEP ISOLATED`:** Do not synchronize remaining Case facts; preserve the source branch graph independently (exceptions already copied under `auto_merge_exception` remain on the target).
+3.  **`DELETE`:** Discard non-exception triples from the source branch graph to maintain a clean database state.
+    *   Under **`auto_merge_exception`:** Only experimental Case facts are discarded; approved exceptions were already copied to the target and are **not** affected.
+    *   Under **`no_auto_merge`:** Discards the **entire** source branch graph, including all approved exceptions. The prompt MUST surface this consequence explicitly before the developer confirms.
+
+```mermaid
+graph TD
+    GitMerge["Git merge detected<br>(feature-a → main)"] --> Policy{"branch_merge.policy"}
+    Policy -->|auto_merge| AutoAll["Copy all Case facts<br>+ approved exceptions<br>to target graph"]
+    Policy -->|auto_merge_exception| AutoExc["Copy approved exceptions<br>to target graph"]
+    AutoExc --> PromptFacts["Prompt: MERGE / KEEP ISOLATED / DELETE<br>(remaining Case facts only)"]
+    Policy -->|no_auto_merge| PromptAll["Prompt: MERGE / KEEP ISOLATED / DELETE<br>(entire source graph;<br>warn if DELETE loses exceptions)"]
+    PromptFacts --> Merge["MERGE → import remaining facts"]
+    PromptFacts --> Keep["KEEP ISOLATED → leave source graph intact"]
+    PromptFacts --> DelExc["DELETE → discard non-exception triples<br>from source graph"]
+    PromptAll --> MergeAll["MERGE → import all facts + exceptions"]
+    PromptAll --> KeepAll["KEEP ISOLATED"]
+    PromptAll --> DelAll["DELETE → discard entire source graph<br>(runtime only; Git audit if exports committed)"]
+    Merge --> ExportMerge["Upsert case-exports graph files<br>+ governance merge record"]
+    MergeAll --> ExportMerge
+    AutoAll --> ExportMerge
+    AutoExc --> ExportMerge
+
+    style GitMerge fill:#1a233a,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Policy fill:#1e1b29,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style AutoAll fill:#1e1b29,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style AutoExc fill:#1e1b29,stroke:#8b5cf6,stroke-width:2px,color:#fff
+```
 
 ---
 
@@ -698,6 +887,8 @@ dist:IdempotentMessageShape a sh:NodeShape ;
 Local exceptions use the **`km:`** governance namespace for bypass metadata, regardless of which LO shape is bypassed. Domain LOs MAY define `*:LocalException` as an OWL class; the validator matches on `km:bypassesShape`, `km:targetNode`, and `km:status`.
 
 When an exception is proposed and authorized, it is serialized directly into the active Case named graph:
+
+> **Branch merge note:** Because exceptions are branch-scoped triples, selecting `DELETE` during merge resolution under `no_auto_merge` discards them permanently. The default `auto_merge_exception` policy copies approved exceptions to the target branch before prompting about remaining Case facts (see §5.3).
 
 ```turtle
 @prefix km: <http://km.local/governance#> .
@@ -783,11 +974,11 @@ km:MR-REACT-CONVENTIONS-042 a km:SemanticMergeRequest ;
 ```
 
 *   **Agent isolation:** Proposal graphs are never merged into the canonical graph and are never visible to `validate_constraints` or default `query_semantic_graph` unions.
-*   **Git export:** On every MR state change (propose, approve, reject), `{source}/exports/governance.ttl` is regenerated from the source governance graph.
+*   **Git export:** On every MR state change (propose, approve, reject), upsert `{source}/exports/governance/{mr-id}.ttl` for that MR (do not regenerate unrelated MR files).
 *   **Cache sync:** On propose, workspace cache is not updated; on approve/reject, full cache rebuild from exports.
 
 **On propose**, after writing source graphs, `MergeRequestService` also:
-3.  Regenerates `{source}/exports/governance.ttl`.
+3.  Upserts `{source}/exports/governance/{mr-id}.ttl`.
 4.  Materializes derived review document at `.km/mrs/` and/or `km://mr/{ontology-id}/{mr-id}`.
 
 ### 7.2 Human Review Document (Derived View)
@@ -879,7 +1070,7 @@ The server-side `MergeRequestService` (invoked by the `approve_semantic_mr` tool
 2.  **Resolve** the `doc_identifier` to the corresponding pending MR record in the **source** LO governance graph.
 3.  **Merge** proposal quads from `http://km.local/learning-ontologies/{id}/mr/{mr-id}` into the source canonical graph, applying insertions and deletions.
 4.  **Update** governance triples in `{source}/lo_quads.db`: set `km:status "APPROVED"`, record `km:approvedAt` and `km:approver`.
-5.  **Regenerate** `{source}/exports/main.ttl` and `{source}/exports/governance.ttl` for Git commit in the LO repository.
+5.  **Regenerate** `{source}/exports/main.ttl` and **upsert** `{source}/exports/governance/{mr-id}.ttl` for Git commit in the LO repository.
 6.  **Refresh** the workspace cache (full rebuild from updated exports) and update `sync-manifest.json`.
 7.  **Reload** the in-memory canonical Learning Ontology cache from the refreshed workspace cache.
 

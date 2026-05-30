@@ -11,7 +11,11 @@ A workspace with KM initialized:
 ```
 my-app/
 ├── .git/
-├── .km/
+├── case-exports/            # Case Git authority (commit with source)
+│   ├── graphs/
+│   ├── governance/
+│   └── sync-manifest.json
+├── .km/                     # runtime (Git ignored)
 │   ├── config.json
 │   ├── case_quads.db
 │   ├── lo-cache/
@@ -35,9 +39,17 @@ Example `.km/config.json`:
     "engine": "sqlite-quad",
     "storage_path": "./.km/case_quads.db"
   },
-  "lo_cache": { "base_path": "./.km/lo-cache" }
+  "lo_cache": { "base_path": "./.km/lo-cache" },
+  "case_exports": { "base_path": "./case-exports", "export_policy": "on_commit" },
+  "branch_merge": { "policy": "auto_merge_exception" }
 }
 ```
+
+`case_exports.export_policy` controls when Case Turtle files are written (default `on_commit` — see spec §2.6). Commit `case-exports/` with application changes for audit and review.
+
+`branch_merge.policy` controls Case graph sync after Git merge (see spec §5.3): `auto_merge_exception` (default) auto-imports approved exceptions then prompts for remaining facts; `auto_merge` imports everything; `no_auto_merge` prompts for the entire source graph (DELETE there also discards exceptions).
+
+Bundled LO packages ship with this repo under [ontologies/](ontologies/README.md) (e.g. `hexagonal-architecture`).
 
 The KM MCP server must be running and connected to your agent (Cursor, CLI, or other MCP client).
 
@@ -76,7 +88,8 @@ get_system_status()
       }
     ],
     "pending_exceptions_count": 0,
-    "pending_mrs_count": 0
+    "pending_mrs_count": 0,
+    "branch_merge_policy": "auto_merge_exception"
   }
 ```
 
@@ -213,7 +226,7 @@ propose_semantic_mr({
 The server:
 
 - Writes proposal + governance triples to the **source** LO package
-- Regenerates `{source}/exports/governance.ttl`
+- Upserts `{source}/exports/governance/MR-042.ttl`
 - Does **not** update the workspace cache yet
 - Creates a review doc at `.km/mrs/mr-react-conventions-042.md`
 
@@ -237,7 +250,7 @@ approve_semantic_mr({
   }
 ```
 
-On approval the server merges into the source canonical graph, regenerates exports, and **fully rebuilds** `.km/lo-cache/`.
+On approval the server merges into the source canonical graph, regenerates `exports/main.ttl`, updates `exports/governance/{mr-id}.ttl`, and **fully rebuilds** `.km/lo-cache/`.
 
 **Tool:** `get_system_status` — confirm cache sync and updated bindings.
 
@@ -250,26 +263,26 @@ On approval the server merges into the source canonical graph, regenerates expor
 
 ## Tool reference (quick)
 
-| Order | Tool                               | When to use                        |
-| :---- | :--------------------------------- | :--------------------------------- |
-| 1     | `get_system_status`                | Session start; after MR approval   |
-| —     | `km://schemas/learning-ontologies` | Before ingesting facts             |
-| 2     | `ingest_case_facts`                | After code/design changes          |
-| 3     | `query_semantic_graph`             | Inspect case + LO canonical state  |
-| 4     | `validate_constraints`             | Before finishing a task            |
-| 5     | `propose_local_exception`          | Legitimate shape bypass needed     |
-| 6     | `approve_local_exception`          | After developer approves exception |
-| 7     | `propose_semantic_mr`              | Promote pattern to LO (curator)    |
-| 8     | `approve_semantic_mr`              | After developer approves MR        |
+| Order | Tool                               | When to use                                                              |
+| :---- | :--------------------------------- | :----------------------------------------------------------------------- |
+| 1     | `get_system_status`                | Session start; after MR approval                                         |
+| —     | `km://schemas/learning-ontologies` | Before ingesting facts                                                   |
+| 2     | `ingest_case_facts`                | After code/design changes; commit `case-exports/` when using `on_commit` |
+| 3     | `query_semantic_graph`             | Inspect case + LO canonical state                                        |
+| 4     | `validate_constraints`             | Before finishing a task                                                  |
+| 5     | `propose_local_exception`          | Legitimate shape bypass needed                                           |
+| 6     | `approve_local_exception`          | After developer approves exception                                       |
+| 7     | `propose_semantic_mr`              | Promote pattern to LO (curator)                                          |
+| 8     | `approve_semantic_mr`              | After developer approves MR                                              |
 
-| Resource                                   | Purpose                                          |
-| :----------------------------------------- | :----------------------------------------------- |
-| `km://schemas/learning-ontologies`         | LO classes, properties, shapes (cache canonical) |
-| `km://case/active-graph`                   | Current branch case facts                        |
-| `km://case/active-exceptions`              | Pending and approved exceptions                  |
-| `km://learning-ontologies/{id}/canonical`  | One LO canonical export                          |
-| `km://learning-ontologies/{id}/governance` | MR governance (source store)                     |
-| `km://mr/{ontology-id}/{mr-id}`            | Derived MR review document                       |
+| Resource                                   | Purpose                                                               |
+| :----------------------------------------- | :-------------------------------------------------------------------- |
+| `km://schemas/learning-ontologies`         | LO classes, properties, shapes (cache canonical)                      |
+| `km://case/active-graph`                   | Current branch case facts (runtime); Git diff: `case-exports/graphs/` |
+| `km://case/active-exceptions`              | Pending and approved exceptions                                       |
+| `km://learning-ontologies/{id}/canonical`  | One LO canonical export                                               |
+| `km://learning-ontologies/{id}/governance` | MR governance (source store)                                          |
+| `km://mr/{ontology-id}/{mr-id}`            | Derived MR review document                                            |
 
 ---
 

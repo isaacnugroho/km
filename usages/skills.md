@@ -109,7 +109,7 @@ sequenceDiagram
     > Use the exact `exception_id` URI returned by `propose_local_exception`.
     > ```
 5.  **Await Approval:** Pause agent execution until the human developer submits the approval.
-6.  **Apply Signature:** Once approved, invoke `approve_local_exception` using the developer's approval signature to permanently register the exception in the branch graph.
+6.  **Apply Signature:** Once approved, invoke `approve_local_exception` using the developer's approval signature to permanently register the exception in the branch graph; the daemon upserts `case-exports/graphs/{active-ref}.ttl`. Approved exceptions are branch-scoped triples; when the feature branch is later merged in Git, the default `auto_merge_exception` policy (`.km/config.json` → `branch_merge.policy`) automatically copies them to the target branch before prompting about remaining Case facts — see spec §5.3.
 
 ---
 
@@ -127,7 +127,7 @@ sequenceDiagram
 
     Agent->>MCP: propose_semantic_mr(target_ontology, rationale, diff)
     MCP->>LO: Write proposal graph + governance triples
-    MCP->>LO: Regenerate exports/governance.ttl
+    MCP->>LO: Upsert exports/governance/MR-042.ttl
     MCP->>MCP: Generate derived review doc .km/mrs/mr-042.md
     MCP-->>Agent: { mr_id, status: PENDING_APPROVAL }
     Agent->>Human: Prompts: approve .km/mrs/mr-042.md

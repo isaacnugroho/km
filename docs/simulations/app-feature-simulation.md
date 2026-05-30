@@ -51,7 +51,8 @@ Enforces design patterns that guarantee message consistency and prevent out-of-o
 ├── lo_quads.db              # runtime (Git ignored)
 └── exports/
     ├── main.ttl             # canonical graph (Git tracked)
-    └── governance.ttl       # MR records (Git tracked)
+    └── governance/          # one file per MR (Git tracked)
+        └── MR-REACT-CONVENTIONS-042.ttl
 ```
 
 Cached locally at `.km/lo-cache/distributed-systems/` in the workspace.
@@ -313,16 +314,26 @@ On curator approval (`approve .km/mrs/mr-react-conventions-042.md`), the proposa
 
 ## 3. Version Control & Git Synchronization
 
-The local Case Ontology quad-store coordinates dual-governance across development branches. Each Learning Ontology is bound via `source` and materialized in `.km/lo-cache/`.
+The local Case Ontology quad-store coordinates dual-governance across development branches. Each Learning Ontology is bound via `source` and materialized in `.km/lo-cache/`. Case exports live in **`case-exports/`** (Git tracked in the app repo; runtime in `.km/case_quads.db`).
+
+```
+case-exports/
+├── graphs/
+│   ├── refs-heads-main.ttl
+│   └── refs-heads-feature-collaborative-canvas.ttl
+├── governance/
+│   └── merge-collaborative-canvas-20260530.ttl
+└── sync-manifest.json
+```
 
 #### Case Ontology Graph Registry
 ```
-┌────────────────────────────────────────────────────────┬──────────────────────────────────────────┐
-│ Context/Named Graph URI                                │ Git Branch Association                   │
-├────────────────────────────────────────────────────────┼──────────────────────────────────────────┤
-│ http://km.local/graphs/main                            │ refs/heads/main                          │
-│ http://km.local/graphs/feature/collaborative-canvas    │ refs/heads/feature/collaborative-canvas  │
-└────────────────────────────────────────────────────────┴──────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────┬──────────────────────────────────────────┬──────────────────────────────────────────────────┐
+│ Context/Named Graph URI                                │ Git Branch Association                   │ Git export file                                  │
+├────────────────────────────────────────────────────────┼──────────────────────────────────────────┼──────────────────────────────────────────────────┤
+│ http://km.local/graphs/main                            │ refs/heads/main                          │ case-exports/graphs/refs-heads-main.ttl          │
+│ http://km.local/graphs/feature/collaborative-canvas    │ refs/heads/feature/collaborative-canvas  │ case-exports/graphs/refs-heads-feature-…       │
+└────────────────────────────────────────────────────────┴──────────────────────────────────────────┴──────────────────────────────────────────────────┘
 ```
 
 #### Learning Ontology Graph Registry (per ontology)
@@ -342,8 +353,9 @@ The local Case Ontology quad-store coordinates dual-governance across developmen
     - Both the React hook correction facts and the `ephemeral_coordinates_bypass` exception hide in the background, keeping the clean main graph untouched.
 2.  **Branch Merge (`git merge feature/collaborative-canvas`)**:
     - The daemon catches the Git merge event.
-    - It warns the developer about the `ephemeral_coordinates_bypass` exception on `feature/collaborative-canvas`.
-    - The developer confirms the sync, promoting the React component facts and the approved exception cleanly into `main`'s permanent workspace graph.
+    - Under the default **`auto_merge_exception`** policy, it **automatically copies** the approved `ephemeral_coordinates_bypass` exception (rationale and signature) into `main`'s graph first.
+    - It then prompts the developer to MERGE, KEEP ISOLATED, or DELETE the **remaining** Case facts (React hook corrections, component metadata). `DELETE` discards only non-exception triples from runtime — the bypass is on `main`, and committed `case-exports/` preserves audit either way.
+    - The developer chooses MERGE, promoting the React component facts into `main`'s graph. The daemon upserts `case-exports/graphs/refs-heads-main.ttl` and writes `case-exports/governance/merge-collaborative-canvas-20260530.ttl` with `km:BranchMergeResolution`.
 
 ---
 

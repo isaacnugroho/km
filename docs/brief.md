@@ -16,7 +16,7 @@ Learning ontologies are collection of knowledge organized or categorized by doma
 - Referenced by the workspace via an **object binding** in `.km/config.json` (`ontology_id`, `source`, `mode`)
 - Materialized locally in `.km/lo-cache/{ontology-id}/` for runtime validation and query
 - A `README.md` file in the source package that describes the purpose of the ontology
-- Git-tracked Turtle exports in `{source}/exports/main.ttl` (canonical state) and `{source}/exports/governance.ttl` (MR records); database files are runtime-only and Git-ignored
+- Git-tracked Turtle exports in `{source}/exports/main.ttl` (canonical state) and `{source}/exports/governance/{mr-id}.ttl` (one file per MR record); database files are runtime-only and Git-ignored
 - Should be self contained with all neccessary classes and relationship and can be used independently
 - Agents validate and query against the **cached canonical named graph only**; pending MR proposal graphs are excluded
 
@@ -24,12 +24,12 @@ Adding knowledge to the learning ontology involves the following steps:
 1. Identify new concepts and relationships.
 2. Create a merge request with a semantic diff — recorded in the **source** LO governance graph and a proposal named graph inside `{source}/lo_quads.db` (requires `mode: "curator"` on the binding).
 3. Human reviews and approves the merge request (via derived review document at `.km/mrs/` or `km://mr/{ontology-id}/{mr-id}`).
-4. The canonical graph is updated only after approval; `{source}/exports/main.ttl` and `{source}/exports/governance.ttl` are regenerated; workspace cache is fully rebuilt on approve/reject only (not on propose).
+4. The canonical graph is updated only after approval; `{source}/exports/main.ttl` is regenerated and the MR's `{source}/exports/governance/{mr-id}.ttl` is updated; workspace cache is fully rebuilt on approve/reject only (not on propose).
 
 > [!NOTE]
 > **Domain-Specific Merge Requests:** A "Merge Request" (MR) within the KM system is an *internal, semantic-level concept* rather than a Git/GitHub/GitLab hosting platform PR/MR. While it conceptually mirrors the propose-review-approve-merge lifecycle, it is executed and tracked entirely within the target Learning Ontology's quad-store governance graph.
 > 
-> *   **Authoritative Record:** Each MR is stored as RDF triples in the LO governance named graph (`http://km.local/learning-ontologies/{id}/governance`) with proposal quads in a dedicated MR graph. Git-tracked `exports/governance.ttl` mirrors this state.
+> *   **Authoritative Record:** Each MR is stored as RDF triples in the LO governance named graph (`http://km.local/learning-ontologies/{id}/governance`) with proposal quads in a dedicated MR graph. Git-tracked `exports/governance/{mr-id}.ttl` mirrors each MR record.
 > *   **Review Document (Derived):** A human-readable markdown view is generated at `.km/mrs/mr-<mr-id>.md` containing:
 >     1.  **Summary of Changes:** Metadata (including the **exact approval command** to run, target ontology, author, and date), engineering rationale, targeted concepts, and high-level structural impact.
 >     2.  **Detailed Changes:** The exact technical diff specifying the RDF `diff_insertions` and `diff_deletions` in Turtle serialization (diffed against `exports/main.ttl`).
@@ -44,7 +44,8 @@ Adding knowledge to the learning ontology involves the following steps:
 ## The Case Ontology
 
 The Case Ontology:
-- Located in the workspace/working directory (`.km/case_quads.db`)
+- **Runtime:** `.km/case_quads.db` (Git ignored)
+- **Git authority:** `case-exports/` at the workspace root (`graphs/` per branch, `governance/` per merge/audit event) — same export model as LO (see spec §2.6)
 - References learning ontologies via **object bindings** in `.km/config.json`, not by requiring LO directories in the workspace tree
 - Has knowledge related to the current problem/case being solved, including the facts, concepts, relationship, rules and process being applied
 - Each "how" knowledge i.e. the "how" part of the solution should be linked to the related learning ontologies knowledge
@@ -63,7 +64,8 @@ Human can initiate promoting knowledge from the case ontology to learning ontolo
       "mode": "read_only"
     }
   ],
-  "lo_cache": { "base_path": "./.km/lo-cache" }
+  "lo_cache": { "base_path": "./.km/lo-cache" },
+  "case_exports": { "base_path": "./case-exports", "export_policy": "on_commit" }
 }
 ```
 
@@ -80,17 +82,24 @@ Who owns, validates, and authors the semantic graph?
 
 ## Version Control & State Synchronization
 
-The Case Ontology is not synchronized with the source code repository. The Case Ontology is specific to a workspace and is not version controlled in the same way as the source code repository.
+Learning Ontologies and the Case Ontology share the same **runtime vs export** pattern: Git-ignored quad-stores for MCP performance; Git-tracked Turtle exports for review and audit.
 
-Learning Ontologies use a split model across source packages and workspace cache:
-- **Source package** (`{source}/`): `lo_quads.db` is runtime-only (Git ignored); `exports/main.ttl` and `exports/governance.ttl` are Git-tracked authoritative snapshots.
-- **Workspace cache** (`.km/lo-cache/{ontology-id}/`): synced from source exports on startup; used for all agent reads and validation.
+| Layer                  | Runtime (Git ignored)           | Git authority (tracked)                                                   | Export triggers                                                          |
+| :--------------------- | :------------------------------ | :------------------------------------------------------------------------ | :----------------------------------------------------------------------- |
+| **Learning Ontology**  | `{source}/lo_quads.db`          | `{source}/exports/main.ttl`, `exports/governance/{mr-id}.ttl`             | MR propose (governance shard); MR approve (main + governance)            |
+| **Case Ontology**      | `.km/case_quads.db`             | `case-exports/graphs/{ref}.ttl`, `case-exports/governance/{event-id}.ttl` | Ingest (per `export_policy`); exception approve; branch merge resolution |
+| **LO workspace cache** | `.km/lo-cache/{id}/lo_quads.db` | — (synced from LO source exports)                                         | LO MR approve/reject                                                     |
+
+- **Source package** (`{source}/`): `lo_quads.db` is runtime-only; `exports/` is Git authority.
+- **Case exports** (`case-exports/`): committed in the **application repo** alongside source code.
+- **Workspace runtime** (`.km/`): `config.json`, `case_quads.db`, `lo-cache/`, derived `mrs/` — Git ignored.
+- **Workspace cache** (`.km/lo-cache/{ontology-id}/`): synced from LO source exports on startup.
 - **Bindings** specify `ontology_id`, `source` path, and `mode` (`read_only` or `curator`).
 
 - **Branch Switch Detection:** watch `.git/HEAD`
-- **Branch Inheritance & Fallback Logic:** The case ontology is cloned from the parent branch when a new branch is created.
-- **Workspace Portability & Porting:** Human should manualy copy/backup and restore the case ontology.
-- **Branch Merging Logic:** The system monitors Git state changes (via `.git/refs/` and `.git/HEAD`). When a branch (e.g. `feature-a`) is detected as merged into the active branch (either locally or via a pulled remote merge), the system does not merge automatically. Instead, it flags a warning to the developer, allowing them to explicitly decide whether to merge the branch's Case Ontology graph into the active branch graph or ignore and delete it.
+- **Branch Inheritance & Fallback Logic:** The case ontology is cloned from the parent branch when a new branch is created (optional export of new branch graph file).
+- **Workspace Portability & Porting:** Clone the repo and commit `case-exports/` to restore audit and branch snapshots; optionally copy `.km/` for a warm runtime cache.
+- **Branch Merging Logic:** The system monitors Git state changes (via `.git/refs/` and `.git/HEAD`). Case graph sync follows `branch_merge.policy` in `.km/config.json`. Merge resolutions are recorded in `case-exports/governance/`. With committed exports, approved exceptions and merge decisions remain auditable in Git even when runtime `DELETE` clears branch graphs; without exports, recovery requires `.km` backup (see spec §5.3).
 
 ## Conflict Resolution & Validation
 
@@ -104,23 +113,23 @@ The KM MCP Server exposes eight Tools and six Resources to the host agent, enabl
 
 ### 1. MCP Tools
 
-| Tool Name                 | Parameters                                                                                           | Returns                                                                                                                    | Description                                                                                                                                                                       |
-| :------------------------ | :--------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ingest_case_facts`       | `facts` (JSON-LD or Turtle string), `format` (string)                                                | `{ "status": "success", "triples_added": int }`                                                                            | Ingests new contextual facts, concepts, and relationships from the active case into the named graph mapped to the active branch.                                                  |
-| `validate_constraints`    | *None*                                                                                               | `{ "conforms": bool, "violations": [Violation] }`                                                                          | Runs SHACL validation on the active named graph against shapes from LO **canonical graphs** only. Halts execution if violations are found and no approved local exception exists. |
-| `propose_local_exception` | `bypasses_shape` (URI), `target_node` (URI), `rationale` (string)                                    | `{ "exception_id": URI, "status": "PENDING_APPROVAL" }`                                                                    | Declares a local exception to bypass a specific SHACL shape for a given focus node. Returns details so the agent can prompt the human developer.                                  |
-| `approve_local_exception` | `exception_id` (URI), `approver` (string), `signature` (string)                                      | `{ "status": "APPROVED", "timestamp": string }`                                                                            | Records human approval signature and timestamp, enabling the SHACL linter to bypass the specified shape constraint.                                                               |
-| `query_semantic_graph`    | `query` (SPARQL query string)                                                                        | SPARQL Select/Ask Result (JSON)                                                                                            | Executes a read-only SPARQL query over the merged active Case named graph and LO **canonical graphs** only.                                                                       |
-| `propose_semantic_mr`     | `target_ontology` (URI), `rationale` (string), `diff_insertions` (Turtle), `diff_deletions` (Turtle) | `{ "mr_id": URI, "status": "PENDING_APPROVAL" }`                                                                           | Creates a semantic MR in the **source** LO store (requires `mode: "curator"`); generates a derived review document in `.km/mrs/`.                                                 |
-| `get_system_status`       | *None*                                                                                               | `{ "active_branch": string, "learning_ontologies": [Binding], "pending_exceptions_count": int, "pending_mrs_count": int }` | `pending_mrs_count` from **source** governance graphs.                                                                                                                            |
-| `approve_semantic_mr`     | `doc_identifier` (string)                                                                            | `{ "status": "APPROVED", "mr_id": URI, "target_ontology": URI, "timestamp": string }`                                      | Merges in **source** LO store (requires `mode: "curator"`), regenerates source exports, refreshes workspace cache, reloads in-memory LO cache.                                    |
+| Tool Name                 | Parameters                                                                                           | Returns                                                                                                                                                   | Description                                                                                                                                                                       |
+| :------------------------ | :--------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ingest_case_facts`       | `facts` (JSON-LD or Turtle string), `format` (string)                                                | `{ "status": "success", "triples_added": int }`                                                                                                           | Ingests new contextual facts, concepts, and relationships from the active case into the named graph mapped to the active branch.                                                  |
+| `validate_constraints`    | *None*                                                                                               | `{ "conforms": bool, "violations": [Violation] }`                                                                                                         | Runs SHACL validation on the active named graph against shapes from LO **canonical graphs** only. Halts execution if violations are found and no approved local exception exists. |
+| `propose_local_exception` | `bypasses_shape` (URI), `target_node` (URI), `rationale` (string)                                    | `{ "exception_id": URI, "status": "PENDING_APPROVAL" }`                                                                                                   | Declares a local exception to bypass a specific SHACL shape for a given focus node. Returns details so the agent can prompt the human developer.                                  |
+| `approve_local_exception` | `exception_id` (URI), `approver` (string), `signature` (string)                                      | `{ "status": "APPROVED", "timestamp": string }`                                                                                                           | Records human approval signature and timestamp, enabling the SHACL linter to bypass the specified shape constraint.                                                               |
+| `query_semantic_graph`    | `query` (SPARQL query string)                                                                        | SPARQL Select/Ask Result (JSON)                                                                                                                           | Executes a read-only SPARQL query over the merged active Case named graph and LO **canonical graphs** only.                                                                       |
+| `propose_semantic_mr`     | `target_ontology` (URI), `rationale` (string), `diff_insertions` (Turtle), `diff_deletions` (Turtle) | `{ "mr_id": URI, "status": "PENDING_APPROVAL" }`                                                                                                          | Creates a semantic MR in the **source** LO store (requires `mode: "curator"`); generates a derived review document in `.km/mrs/`.                                                 |
+| `get_system_status`       | *None*                                                                                               | `{ "active_branch": string, "learning_ontologies": [Binding], "pending_exceptions_count": int, "pending_mrs_count": int, "branch_merge_policy": string }` | Includes effective `branch_merge.policy` (`auto_merge_exception` default). `pending_mrs_count` from **source** governance graphs.                                                 |
+| `approve_semantic_mr`     | `doc_identifier` (string)                                                                            | `{ "status": "APPROVED", "mr_id": URI, "target_ontology": URI, "timestamp": string }`                                                                     | Merges in **source** LO store (requires `mode: "curator"`), regenerates source exports, refreshes workspace cache, reloads in-memory LO cache.                                    |
 
 ### 2. MCP Resources
 
 The server exposes read-only structural data to the host agent to clarify schema definitions and active states:
 
 - **`km://schemas/learning-ontologies`**: Retrieves metadata and schemas for all active global Learning Ontologies (canonical graphs only), configured in `.km/config.json`.
-- **`km://case/active-graph`**: Returns the complete serialized RDF model of the current Git branch's named graph.
+- **`km://case/active-graph`**: Returns the complete serialized RDF model of the current Git branch's named graph (runtime). Git diffs use `case-exports/graphs/{ref}.ttl`.
 - **`km://case/active-exceptions`**: Lists all active local exceptions (both pending and approved) registered for the current workspace.
 - **`km://learning-ontologies/{ontology-id}/canonical`**: Returns the serialized canonical graph for a specific Learning Ontology.
 - **`km://learning-ontologies/{ontology-id}/governance`**: Returns MR governance records from **source** LO store (curator review).

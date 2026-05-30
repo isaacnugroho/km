@@ -33,7 +33,7 @@ You MUST integrate KM MCP tool operations into your standard execution loop at s
 
 ### Phase 1: Context Ingestion & Alignment (On Startup / Task Start)
 Before writing any code or proposing plans, align your context window with the workspace's loaded ontologies:
-1.  **Retrieve System Status:** Invoke `get_system_status` to determine the active Git branch and the loaded Learning Ontology bindings (ontology_id, source, mode, cache sync state).
+1.  **Retrieve System Status:** Invoke `get_system_status` to determine the active Git branch, the effective `branch_merge_policy`, and the loaded Learning Ontology bindings (ontology_id, source, mode, cache sync state).
 2.  **Inspect Active Schemas:** Read the schema resource at `km://schemas/learning-ontologies` to understand available classes, properties, and constraint boundaries (sourced from cached LO **canonical graphs** only).
 3.  **Read Case Triples:** Load `km://case/active-graph` or execute targeted SPARQL read queries (`query_semantic_graph`) to understand what structural facts have already been established for this branch.
 
@@ -80,6 +80,8 @@ mcp_client.call_tool(
     {"facts": facts_turtle, "format": "turtle"}
 )
 ```
+
+Facts are written to `.km/case_quads.db` first. The daemon updates `case-exports/graphs/{active-ref}.ttl` per `case_exports.export_policy` (default: on git commit or `km export-case`). **Do not** hand-edit export files.
 
 ---
 
@@ -139,6 +141,7 @@ mcp_client.call_tool(
 )
 ```
 *   **Next Step:** Present the generated `exception_id` to the developer and prompt them to run `approve km://case/active-exceptions/{exception-id}` before completing the transaction.
+*   **Export:** After approval, the daemon upserts `case-exports/graphs/{active-ref}.ttl` (exceptions remain in the branch graph per spec §6.1).
 
 ---
 

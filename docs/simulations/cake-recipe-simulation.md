@@ -46,7 +46,8 @@ This is the global, shared, version-controlled repository of baking science at `
 ├── lo_quads.db              # runtime (Git ignored)
 └── exports/
     ├── main.ttl             # canonical graph (Git tracked)
-    └── governance.ttl       # MR records (Git tracked)
+    └── governance/          # one file per MR (Git tracked)
+        └── MR-BAKING-017.ttl
 ```
 
 #### `README.md` (Ontology Declaration)
@@ -298,22 +299,32 @@ The derived review document shows the diff against `exports/main.ttl`:
 ```
 
 #### Review & Governance Cycle
-The Semantic MR is recorded in the source baking LO governance graph and exported to `{source}/exports/governance.ttl`. The curator reviews the derived markdown document and physical test reports, then approves via `approve .km/mrs/mr-baking-017.md`. On merge, proposal quads flow into the source canonical graph, `{source}/exports/main.ttl` is regenerated, the workspace cache at `.km/lo-cache/baking/` is refreshed, and **any other agent** creating citrus, floral, or lavender chiffon cakes inherits the stabilization rule.
+The Semantic MR is recorded in the source baking LO governance graph and exported to `{source}/exports/governance/MR-BAKING-017.ttl`. The curator reviews the derived markdown document and physical test reports, then approves via `approve .km/mrs/mr-baking-017.md`. On merge, proposal quads flow into the source canonical graph, `{source}/exports/main.ttl` is regenerated, the workspace cache at `.km/lo-cache/baking/` is refreshed, and **any other agent** creating citrus, floral, or lavender chiffon cakes inherits the stabilization rule.
 
 ---
 
 ## 3. Version Control & State Synchronization
 
-Because the Case Ontology is structured as a **Quad-Store**, every fact and assertion belongs to a specific named graph linked directly to the repository's Git branch structure. Learning Ontologies are bound via `source` paths and materialized in `.km/lo-cache/`; Git tracks exports in the LO source repositories.
+Because the Case Ontology is structured as a **Quad-Store**, every fact and assertion belongs to a specific named graph linked directly to the repository's Git branch structure. Learning Ontologies are bound via `source` paths and materialized in `.km/lo-cache/`; Git tracks LO exports in source repositories. Case facts are tracked in **`case-exports/`** in the application repo (same export model as LO; see spec §2.6).
+
+```
+case-exports/
+├── graphs/
+│   ├── refs-heads-main.ttl
+│   └── refs-heads-feature-lavender-cocoa-chiffon.ttl
+├── governance/
+│   └── merge-lavender-cocoa-chiffon-20260530.ttl
+└── sync-manifest.json
+```
 
 #### Case Ontology Graph Registry
 ```
-┌────────────────────────────────────────────────────────┬──────────────────────────────────────────┐
-│ Context/Named Graph URI                                │ Git Branch Association                   │
-├────────────────────────────────────────────────────────┼──────────────────────────────────────────┤
-│ http://km.local/graphs/main                            │ refs/heads/main                          │
-│ http://km.local/graphs/feature/lavender-cocoa-chiffon  │ refs/heads/feature/lavender-cocoa-chiffon│
-└────────────────────────────────────────────────────────┴──────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────┬──────────────────────────────────────────┬─────────────────────────────────────────────┐
+│ Context/Named Graph URI                                │ Git Branch Association                   │ Git export file                             │
+├────────────────────────────────────────────────────────┼──────────────────────────────────────────┼─────────────────────────────────────────────┤
+│ http://km.local/graphs/main                            │ refs/heads/main                          │ case-exports/graphs/refs-heads-main.ttl     │
+│ http://km.local/graphs/feature/lavender-cocoa-chiffon  │ refs/heads/feature/lavender-cocoa-chiffon│ case-exports/graphs/refs-heads-feature-…  │
+└────────────────────────────────────────────────────────┴──────────────────────────────────────────┴─────────────────────────────────────────────┘
 ```
 
 #### Baking LO Graph Registry
@@ -347,35 +358,39 @@ git merge feature/lavender-cocoa-chiffon
 
 The KM system monitors `.git/refs/heads/main`. It detects that `feature/lavender-cocoa-chiffon` was merged into `main`.
 
-Instead of blindly merging the triple database (which could import messy, intermediate trial-and-error facts), the KM MCP system halts and prompts the developer:
+The workspace uses the default **`auto_merge_exception`** policy (`.km/config.json` → `"branch_merge": { "policy": "auto_merge_exception" }`). Because approved exceptions live as triples in the feature branch graph, the daemon **automatically copies** the `bloomed_cocoa_emulsion_folding` exception (rationale, approver signature, and timestamp) into `http://km.local/graphs/main` before prompting about remaining Case facts. With **`case-exports/`** committed, choosing `DELETE` clears only runtime non-exception triples on the feature graph; the exception and merge decision remain auditable in Git via graph snapshots and `case-exports/governance/merge-lavender-cocoa-chiffon-20260530.ttl`.
+
+The system then prompts the developer about the **remaining** experimental Case facts (trial proportions, humidity notes, intermediate failures):
 
 ```
 [KM MCP STATE SYNCHRONIZER] Git Merge Event Detected!
   Source: refs/heads/feature/lavender-cocoa-chiffon
   Target: refs/heads/main
+  Policy: auto_merge_exception
 
-The merged branch contains local semantic facts and 1 approved exception:
-  -> Exception: bloomed_cocoa_emulsion_folding (Approved by ChefDev)
+✓ Auto-merged 1 approved exception to main:
+  -> bloomed_cocoa_emulsion_folding (Approved by ChefDev)
 
-Would you like to synchronize the Case Ontology?
-  [1] MERGE case graph to main (promotes recipe structure to official stable status)
-  [2] KEEP ISOLATED (do not sync semantic graphs; archive the feature graph)
-  [3] DELETE (discard the feature case graph)
+The source branch still contains 47 Case fact triples (recipe proportions, trial notes).
+Would you like to synchronize the remaining Case Ontology facts?
+  [1] MERGE (promote finalized recipe structure to official stable status)
+  [2] KEEP ISOLATED (leave feature graph intact; exception already on main)
+  [3] DELETE (discard non-exception triples from feature graph only)
 
 Select option [1-3]: _
 ```
 
-The developer chooses `[1]`. The semantic facts representing the finalized recipe proportions and the approved emulsion-folding exception are merged into `http://km.local/graphs/main`, creating a permanent version-controlled record of the recipe's design rationale and physical parameters.
+The developer chooses `[1]`. The semantic facts representing the finalized recipe proportions are merged into `http://km.local/graphs/main`. The emulsion-folding exception was already present from the auto-merge step. The daemon upserts `case-exports/graphs/refs-heads-main.ttl` and writes `case-exports/governance/merge-lavender-cocoa-chiffon-20260530.ttl` recording `km:resolution "MERGE"` — creating a permanent Git-auditable record of both the recipe's physical parameters and its authorized constraint bypass.
 
 ---
 
 ## 4. Summary of Design Mechanics Demonstrated
 
-| KM MCP Component                   | Culinary Domain Translation                                                                 | System Action / Benefit                                                                                                                    |
-| :--------------------------------- | :------------------------------------------------------------------------------------------ | :----------------------------------------------------------------------------------------------------------------------------------------- |
-| **Learning Ontology**              | Baking Science & Laws of Chemistry (Egg white behavior, fat interactions, acidity controls) | Prevents the generator from outputting impossible/collapsing recipe designs (no hallucinations).                                           |
-| **Case Ontology**                  | The specific "Lavender & Cocoa Chiffon" recipe project                                      | Captures raw experimental variables, local kitchen humidity, exact ingredient batches.                                                     |
-| **SHACL Constraint Linter**        | Structural shape validation check (Fat vs. Albumen Foam)                                    | Automatically validates active graph states against structural shapes and halts execution on violations.                                   |
-| **Exception Authority**            | separation-of-streams emulsion and gentle folding technique                                 | Allows local workarounds for physical constraints with mandatory developer signature, linked to specific target nodes and bypassed shapes. |
-| **Knowledge Promotion**            | Promoting "Cream of Tartar stabilizes Linalool collapse" to global SHACL shapes             | Captures local empirical discoveries and generalizes them into organizational shapes and rules.                                            |
-| **Named Graphs / Git Integration** | Separating trial recipes according to current test branch                                   | Guarantees experimental changes to ingredient proportions don't corrupt the main production menu.                                          |
+| KM MCP Component                   | Culinary Domain Translation                                                                 | System Action / Benefit                                                                                                                                                         |
+| :--------------------------------- | :------------------------------------------------------------------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Learning Ontology**              | Baking Science & Laws of Chemistry (Egg white behavior, fat interactions, acidity controls) | Prevents the generator from outputting impossible/collapsing recipe designs (no hallucinations).                                                                                |
+| **Case Ontology**                  | The specific "Lavender & Cocoa Chiffon" recipe project                                      | Captures raw experimental variables, local kitchen humidity, exact ingredient batches.                                                                                          |
+| **SHACL Constraint Linter**        | Structural shape validation check (Fat vs. Albumen Foam)                                    | Automatically validates active graph states against structural shapes and halts execution on violations.                                                                        |
+| **Exception Authority**            | separation-of-streams emulsion and gentle folding technique                                 | Allows local workarounds for physical constraints with mandatory developer signature, linked to specific target nodes and bypassed shapes.                                      |
+| **Knowledge Promotion**            | Promoting "Cream of Tartar stabilizes Linalool collapse" to global SHACL shapes             | Captures local empirical discoveries and generalizes them into organizational shapes and rules.                                                                                 |
+| **Named Graphs / Git Integration** | Separating trial recipes according to current test branch                                   | Guarantees experimental changes to ingredient proportions don't corrupt the main production menu; default `auto_merge_exception` policy preserves approved exceptions on merge. |
