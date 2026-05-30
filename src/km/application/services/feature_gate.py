@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from km.exceptions import FeatureNotImplementedError
 
-# Phase 3: SHACL validation, exceptions, and schema resources enabled.
+# Phase 4a: LO canonical/governance resources and source store reads enabled.
 FEATURES: dict[str, bool] = {
     "get_system_status": True,
     "ingest_case_facts": True,
@@ -17,8 +17,8 @@ FEATURES: dict[str, bool] = {
     "resource:schemas/learning-ontologies": True,
     "resource:case/active-graph": True,
     "resource:case/active-exceptions": True,
-    "resource:lo/canonical": False,
-    "resource:lo/governance": False,
+    "resource:lo/canonical": True,
+    "resource:lo/governance": True,
     "resource:mr": False,
     "cli:export-case": False,
 }

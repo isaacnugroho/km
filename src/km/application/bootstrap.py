@@ -10,6 +10,8 @@ from km.application.services.case_ingest_service import CaseIngestService
 from km.application.services.case_store_service import CaseStoreService
 from km.application.services.exception_service import ExceptionService
 from km.application.services.lo_cache_service import LOCacheService
+from km.application.services.lo_resource_service import LOResourceService
+from km.application.services.lo_source_store_service import LOSourceStoreService
 from km.application.services.query_service import QueryService
 from km.application.services.schema_service import SchemaService
 from km.application.services.status_service import StatusService, SystemStatus
@@ -37,6 +39,8 @@ class KMApplication:
     validation: ValidationService
     exceptions: ExceptionService
     schemas: SchemaService
+    lo_source_store: LOSourceStoreService
+    lo_resources: LOResourceService
 
     @classmethod
     def bootstrap(cls, workspace_root: Path | None = None) -> KMApplication:
@@ -58,6 +62,10 @@ class KMApplication:
 
         lo_cache.sync_all(binding_data)
         shacl_cache = ShaclCache.compile_from_lo_entries(lo_cache.entries)
+
+        lo_source_store = LOSourceStoreService()
+        lo_source_store.bootstrap_all(binding_data)
+        lo_resources = LOResourceService(lo_cache, lo_source_store)
 
         case_db = workspace.resolve_config_path(workspace.config.quad_store.storage_path)
         exports_root = workspace.resolve_config_path(workspace.config.case_exports.base_path)
@@ -87,6 +95,8 @@ class KMApplication:
             validation=validation,
             exceptions=exceptions,
             schemas=schemas,
+            lo_source_store=lo_source_store,
+            lo_resources=lo_resources,
         )
         logger.info("KM bootstrap complete")
         return app
@@ -100,4 +110,5 @@ class KMApplication:
         )
 
     def shutdown(self) -> None:
+        self.lo_source_store.close()
         self.case_store.close()

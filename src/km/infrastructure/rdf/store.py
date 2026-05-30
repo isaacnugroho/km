@@ -12,7 +12,7 @@ from typing import Any
 
 from pyoxigraph import BlankNode, Literal, NamedNode, Quad, RdfFormat, Store
 
-from km.infrastructure.config.models import SyncManifest
+from km.infrastructure.config.models import LOPackageConfig, SyncManifest
 from km.infrastructure.rdf.serialization import serialize_graph_block
 from km.logging_config import get_logger
 
@@ -104,6 +104,23 @@ def needs_cache_rebuild(
     return not checksums_match(manifest.export_checksums, current_checksums)
 
 
+def import_lo_exports_to_store(
+    source_path: Path,
+    lo_config: LOPackageConfig,
+    wrapper: QuadStoreWrapper,
+) -> None:
+    """Import Git-tracked LO exports into a quad store (spec §2.3 / §2.5)."""
+    main_ttl = source_path / "exports" / "main.ttl"
+    logger.debug("Importing %s → %s", main_ttl, lo_config.named_graphs.canonical)
+    wrapper.load_turtle_into_graph(main_ttl, lo_config.named_graphs.canonical)
+
+    governance_dir = source_path / "exports" / "governance"
+    if governance_dir.is_dir():
+        for ttl_file in sorted(governance_dir.glob("*.ttl")):
+            logger.debug("Importing governance shard %s", ttl_file.name)
+            wrapper.load_turtle_into_graph(ttl_file, lo_config.named_graphs.governance)
+
+
 class QuadStoreWrapper:
     """Thin wrapper around pyoxigraph Store."""
 
@@ -117,30 +134,28 @@ class QuadStoreWrapper:
 
     def load_turtle_into_graph(self, turtle_path: Path, graph_uri: str) -> None:
         content = turtle_path.read_bytes()
-        if GRAPH_URI_PATTERN.search(content.decode("utf-8", errors="replace")):
-            self.store.load(
-                input=content,
-                format=TURTLE,
-                lenient=True,
-            )
-        else:
-            self.store.load(
-                input=content,
-                format=TURTLE,
-                to_graph=NamedNode(graph_uri),
-                lenient=True,
-            )
+        self._load_rdf_bytes(content, graph_uri)
 
     def load_turtle_bytes_into_graph(self, content: bytes, graph_uri: str) -> None:
-        if GRAPH_URI_PATTERN.search(content.decode("utf-8", errors="replace")):
-            self.store.load(input=content, format=TURTLE, lenient=True)
-        else:
+        self._load_rdf_bytes(content, graph_uri)
+
+    def _load_rdf_bytes(self, content: bytes, graph_uri: str) -> None:
+        text = content.decode("utf-8", errors="replace")
+        if GRAPH_URI_PATTERN.search(text):
+            self.store.load(
+                input=content,
+                format=RdfFormat.TRIG,
+                lenient=True,
+            )
+        elif graph_uri:
             self.store.load(
                 input=content,
                 format=TURTLE,
                 to_graph=NamedNode(graph_uri),
                 lenient=True,
             )
+        else:
+            self.store.load(input=content, format=TURTLE, lenient=True)
 
     def query(self, sparql: str) -> list[dict[str, str | None]]:
         results: list[dict[str, str | None]] = []

@@ -10,7 +10,7 @@ from km.infrastructure.config.models import LOBinding, LOPackageConfig, SyncMani
 from km.infrastructure.rdf.store import (
     QuadStoreWrapper,
     compute_export_checksums,
-    load_sync_manifest,
+    import_lo_exports_to_store,
     needs_cache_rebuild,
     remove_store,
     write_sync_manifest,
@@ -91,15 +91,7 @@ class LOCacheService:
 
         wrapper = QuadStoreWrapper(cache_db)
         try:
-            main_ttl = source_path / "exports" / "main.ttl"
-            logger.debug("Importing %s → %s", main_ttl, lo_config.named_graphs.canonical)
-            wrapper.load_turtle_into_graph(main_ttl, lo_config.named_graphs.canonical)
-
-            governance_dir = source_path / "exports" / "governance"
-            if governance_dir.is_dir():
-                for ttl_file in sorted(governance_dir.glob("*.ttl")):
-                    logger.debug("Importing governance shard %s", ttl_file.name)
-                    wrapper.load_turtle_into_graph(ttl_file, lo_config.named_graphs.governance)
+            import_lo_exports_to_store(source_path, lo_config, wrapper)
         finally:
             wrapper.close()
 

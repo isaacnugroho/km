@@ -11,6 +11,16 @@ from km.logging_config import get_logger
 logger = get_logger("mcp.resources")
 
 
+def _ontology_id_from_uri(uri: str, suffix: str) -> str:
+    prefix = "km://learning-ontologies/"
+    if not uri.startswith(prefix) or not uri.endswith(suffix):
+        raise ValueError(f"Invalid learning ontology resource URI: {uri}")
+    ontology_id = uri.removeprefix(prefix).removesuffix(suffix)
+    if not ontology_id or "/" in ontology_id:
+        raise ValueError(f"Invalid learning ontology resource URI: {uri}")
+    return ontology_id
+
+
 def read_resource(app: KMApplication, uri: str) -> tuple[str, str]:
     """Return (content, mime_type) for a km:// resource URI."""
     logger.debug("Resource read: %s", uri)
@@ -37,11 +47,15 @@ def read_resource(app: KMApplication, uri: str) -> tuple[str, str]:
 
     if uri.startswith("km://learning-ontologies/") and uri.endswith("/canonical"):
         require_implemented("resource:lo/canonical")
-        return "", "text/turtle"
+        ontology_id = _ontology_id_from_uri(uri, "/canonical")
+        content = app.lo_resources.canonical_turtle(ontology_id)
+        return content, "text/turtle"
 
     if uri.startswith("km://learning-ontologies/") and uri.endswith("/governance"):
         require_implemented("resource:lo/governance")
-        return "", "text/turtle"
+        ontology_id = _ontology_id_from_uri(uri, "/governance")
+        content = app.lo_resources.governance_turtle(ontology_id)
+        return content, "text/turtle"
 
     if uri.startswith("km://mr/"):
         require_implemented("resource:mr")

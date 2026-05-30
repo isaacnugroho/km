@@ -14,8 +14,6 @@ from km.exceptions import FeatureNotImplementedError
     [
         "propose_semantic_mr",
         "approve_semantic_mr",
-        "resource:lo/canonical",
-        "resource:lo/governance",
         "resource:mr",
         "cli:export-case",
     ],
@@ -41,6 +39,11 @@ def test_phase3_features_implemented() -> None:
     require_implemented("approve_local_exception")
     require_implemented("resource:schemas/learning-ontologies")
     require_implemented("resource:case/active-exceptions")
+
+
+def test_phase4a_lo_resources_implemented() -> None:
+    require_implemented("resource:lo/canonical")
+    require_implemented("resource:lo/governance")
 
 
 def test_release_enables_feature() -> None:
