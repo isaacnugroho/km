@@ -1,0 +1,12 @@
+{
+  "ontology_id": "hexagonal-architecture",
+  "base_uri": "http://architecture.org/hexagonal",
+  "quad_store": {
+    "engine": "sqlite-quad",
+    "storage_path": "./lo_quads.db"
+  },
+  "named_graphs": {
+    "canonical": "http://km.local/learning-ontologies/hexagonal-architecture/canonical",
+    "governance": "http://km.local/learning-ontologies/hexagonal-architecture/governance"
+  }
+}

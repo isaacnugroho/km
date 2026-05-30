@@ -1,0 +1,181 @@
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix hex:  <http://architecture.org/hexagonal#> .
+
+<http://architecture.org/hexagonal> rdf:type owl:Ontology ;
+    rdfs:label "Hexagonal Architecture (Ports and Adapters)" ;
+    rdfs:comment "Vocabulary and SHACL constraints for Alistair Cockburn's hexagonal architecture pattern." ;
+    owl:versionInfo "1.0.0" .
+
+### ==========================================
+### 1. Classes (The Vocabulary)
+### ==========================================
+
+hex:ArchitectureConcept rdf:type owl:Class ;
+    rdfs:label "Architecture Concept" ;
+    rdfs:comment "The base class for all Hexagonal Architecture concepts." .
+
+hex:ApplicationCore rdf:type owl:Class ;
+    rdfs:subClassOf hex:ArchitectureConcept ;
+    rdfs:label "Application Core" ;
+    rdfs:comment "Contains the pure business logic, domain entities, and use cases. Has zero dependencies on external frameworks or adapters." .
+
+hex:Port rdf:type owl:Class ;
+    rdfs:subClassOf hex:ArchitectureConcept ;
+    rdfs:label "Port" ;
+    rdfs:comment "An interface at the boundary of the core: how the outside world drives the application, or how the application drives external systems." .
+
+hex:DrivingPort rdf:type owl:Class ;
+    rdfs:subClassOf hex:Port ;
+    rdfs:label "Driving (Primary) Port" ;
+    rdfs:comment "Inbound boundary interface. The contract through which actors invoke application use cases." ;
+    owl:disjointWith hex:DrivenPort .
+
+hex:DrivenPort rdf:type owl:Class ;
+    rdfs:subClassOf hex:Port ;
+    rdfs:label "Driven (Secondary) Port" ;
+    rdfs:comment "Outbound boundary interface. The SPI (Service Provider Interface) the core requires from external systems." .
+
+hex:Adapter rdf:type owl:Class ;
+    rdfs:subClassOf hex:ArchitectureConcept ;
+    rdfs:label "Adapter" ;
+    rdfs:comment "Handles the translation between external technical details and architectural ports." .
+
+hex:DrivingAdapter rdf:type owl:Class ;
+    rdfs:subClassOf hex:Adapter ;
+    rdfs:label "Driving (Primary) Adapter" ;
+    rdfs:comment "An inbound translator (e.g., REST Controller, CLI, Message Listener) that calls a Driving Port." ;
+    owl:disjointWith hex:DrivenAdapter .
+
+hex:DrivenAdapter rdf:type owl:Class ;
+    rdfs:subClassOf hex:Adapter ;
+    rdfs:label "Driven (Secondary) Adapter" ;
+    rdfs:comment "An outbound translator (e.g., SQL Repository, Mail Gateway) that implements a Driven Port." .
+
+
+### ==========================================
+### 2. Properties (The Rules & Boundaries)
+### ==========================================
+
+hex:defines rdf:type owl:ObjectProperty ;
+    rdfs:label "defines" ;
+    rdfs:domain hex:ApplicationCore ;
+    rdfs:range hex:Port ;
+    rdfs:comment "The core owns and defines the port interfaces at its boundary." .
+
+hex:realizes rdf:type owl:ObjectProperty ;
+    rdfs:label "realizes" ;
+    rdfs:domain hex:ApplicationCore ;
+    rdfs:range hex:DrivingPort ;
+    rdfs:comment "The core implements (exposes) this inbound port; use cases fulfill the driving port contract." .
+
+hex:uses rdf:type owl:ObjectProperty ;
+    rdfs:label "uses" ;
+    rdfs:domain hex:ApplicationCore ;
+    rdfs:range hex:DrivenPort ;
+    rdfs:comment "The core depends on this outbound port interface, never on a concrete adapter." .
+
+hex:invokes rdf:type owl:ObjectProperty ;
+    rdfs:label "invokes" ;
+    rdfs:domain hex:DrivingAdapter ;
+    rdfs:range hex:DrivingPort ;
+    rdfs:comment "A driving adapter converts external signals and invokes a driving port interface." .
+
+hex:implements rdf:type owl:ObjectProperty ;
+    rdfs:label "implements" ;
+    rdfs:domain hex:DrivenAdapter ;
+    rdfs:range hex:DrivenPort ;
+    rdfs:comment "A driven adapter implements a driven port interface defined by the core." .
+
+
+### ==========================================
+### 3. SHACL Constraint Shapes
+### ==========================================
+
+hex:DrivingAdapterInvocationShape a sh:NodeShape ;
+    rdfs:label "Driving Adapter Invocation Shape" ;
+    sh:targetClass hex:DrivingAdapter ;
+    sh:property [
+        sh:path hex:invokes ;
+        sh:class hex:DrivingPort ;
+        sh:minCount 1 ;
+        sh:message "Every Driving Adapter must invoke at least one Driving Port." ;
+    ] .
+
+hex:DrivenAdapterImplementationShape a sh:NodeShape ;
+    rdfs:label "Driven Adapter Implementation Shape" ;
+    sh:targetClass hex:DrivenAdapter ;
+    sh:property [
+        sh:path hex:implements ;
+        sh:class hex:DrivenPort ;
+        sh:minCount 1 ;
+        sh:message "Every Driven Adapter must implement at least one Driven Port." ;
+    ] .
+
+hex:PortOwnershipShape a sh:NodeShape ;
+    rdfs:label "Port Ownership Shape" ;
+    sh:targetClass hex:Port ;
+    sh:sparql [
+        sh:message "Every Port must be defined by an Application Core." ;
+        sh:select """
+            SELECT $this
+            WHERE {
+                FILTER NOT EXISTS {
+                    ?core a hex:ApplicationCore ;
+                          hex:defines $this .
+                }
+            }
+        """ ;
+    ] .
+
+hex:CoreRealizesDrivingPortShape a sh:NodeShape ;
+    rdfs:label "Core Realizes Driving Port Shape" ;
+    sh:targetClass hex:ApplicationCore ;
+    sh:sparql [
+        sh:message "An Application Core that defines a Driving Port must also realize it." ;
+        sh:select """
+            SELECT $this
+            WHERE {
+                $this hex:defines ?port .
+                ?port a hex:DrivingPort .
+                FILTER NOT EXISTS {
+                    $this hex:realizes ?port .
+                }
+            }
+        """ ;
+    ] .
+
+hex:CoreUsesDrivenPortShape a sh:NodeShape ;
+    rdfs:label "Core Uses Driven Port Shape" ;
+    sh:targetClass hex:ApplicationCore ;
+    sh:sparql [
+        sh:message "An Application Core that defines a Driven Port must use that port interface (not a concrete adapter)." ;
+        sh:select """
+            SELECT $this
+            WHERE {
+                $this hex:defines ?port .
+                ?port a hex:DrivenPort .
+                FILTER NOT EXISTS {
+                    $this hex:uses ?port .
+                }
+            }
+        """ ;
+    ] .
+
+hex:CoreAdapterIsolationShape a sh:NodeShape ;
+    rdfs:label "Core Adapter Isolation Shape" ;
+    sh:targetClass hex:ApplicationCore ;
+    sh:sparql [
+        sh:message "Application Core must not depend directly on Adapters; depend on ports only." ;
+        sh:select """
+            SELECT $this
+            WHERE {
+                $this ?p ?o .
+                ?o a/rdfs:subClassOf* hex:Adapter .
+                FILTER (?p != rdf:type)
+            }
+        """ ;
+    ] .
