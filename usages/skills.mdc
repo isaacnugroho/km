@@ -1,0 +1,66 @@
+---
+description: KM MCP workspace skills — AST-to-RDF ingestion, SHACL lint cycle, exceptions, semantic MR
+alwaysApply: true
+---
+
+# KM Workspace Skills
+
+Reusable recipes for Knowledge Management MCP operations. Execute these during development in KM-governed workspaces.
+
+## Skill 1: AST-to-RDF Fact Extraction
+
+**When:** After modifying code files (components, endpoints, schemas, configs).
+
+1. Scan modified files; parse AST or configuration structure.
+2. Look up allowed classes/relations in `km://schemas/learning-ontologies`.
+3. Build Turtle grouped by subject URI (e.g. `local:useCanvasDrag`).
+4. **`ingest_case_facts`** with the serialization.
+5. Confirm `triples_added > 0` in the response.
+
+Example mapping:
+
+```turtle
+@prefix react: <http://ontologies.react.org/core#> .
+@prefix local: <http://app.local/hooks#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+local:useCanvasDrag a react:HighFrequencyEventHook ;
+    react:throttleRateMs 32 ;
+    react:filePath "src/hooks/useCanvasDrag.ts"^^xsd:string .
+```
+
+## Skill 2: Continuous SHACL Linter Cycle
+
+**When:** Immediately after any code edit or file generation.
+
+1. **`validate_constraints`**
+2. **`conforms: true`** → proceed with git staging/commits.
+3. **`conforms: false`** → read `focus_node`, `source_shape`, `message`:
+   - Fixable → correct code, re-ingest facts, return to step 1.
+   - Not fixable → Skill 3.
+
+## Skill 3: Local Exception Provisioning
+
+**When:** A SHACL constraint cannot be satisfied without unacceptable degradation.
+
+1. Extract violated `source_shape` URI and target node URI.
+2. Write a descriptive rationale (why conforming is impossible or harmful here).
+3. **`propose_local_exception`** (`bypasses_shape`, `target_node`, `rationale`).
+4. Present developer with exact approval command:
+   `approve km://case/active-exceptions/{exception-id}`
+5. **Pause** until developer approves.
+6. **`approve_local_exception`** with returned signature.
+7. Re-run **`validate_constraints`** — should pass with exception recorded.
+
+Approved exceptions are branch-scoped; `auto_merge_exception` policy copies them on Git merge (see spec §5.3).
+
+## Skill 4: Semantic MR Promotion
+
+**When:** A local structural pattern should evolve shared organizational knowledge (curator binding required).
+
+1. Draft Turtle `diff_insertions` and `diff_deletions`.
+2. **`propose_semantic_mr`** (`target_ontology`, `rationale`, diffs).
+3. Review doc materializes at `.km/mrs/mr-{id}.md` — prompt developer:
+   `approve .km/mrs/mr-{ontology}-{id}.md`
+4. **`approve_semantic_mr`** with `doc_identifier` when developer approves.
+5. On `APPROVED`: **`get_system_status`** — confirm `.km/lo-cache/` rebuilt and canonical cache reloaded.

@@ -1,0 +1,69 @@
+---
+description: KM MCP agent lifecycle — context alignment, fact ingestion, constraint verification, semantic MR
+alwaysApply: true
+---
+
+# KM Agent: Neuro-Symbolic Bridge
+
+You manage formal semantics alongside code. Every structural code change must be reflected, verified, and constrained in the semantic layer (Case Ontology RDF graph vs Learning Ontology SHACL shapes).
+
+## Phase 1 — Context Ingestion (task start)
+
+Before writing code or proposing plans:
+
+1. **`get_system_status`** — active Git branch, `branch_merge_policy`, loaded LO bindings (ontology_id, source, mode, cache sync).
+2. **`km://schemas/learning-ontologies`** — available classes, properties, constraint boundaries (canonical graphs only).
+3. **`km://case/active-graph`** or **`query_semantic_graph`** — existing branch facts.
+
+## Phase 2 — Fact Discovery & Ingestion (during development)
+
+When creating or modifying components, modules, endpoints, or data models:
+
+1. Extract semantics (concepts, types, properties) — not raw file dumps.
+2. Serialize as Turtle or JSON-LD mapped to active LO vocabulary.
+3. **`ingest_case_facts`** — write to the active branch Named Graph.
+
+Facts persist in `.km/case_quads.db`; exports land in `case-exports/graphs/{active-ref}.ttl` per `case_exports.export_policy`. Do not hand-edit export files.
+
+## Phase 3 — Constraint Verification (before turn end)
+
+Before completing a task:
+
+1. **`validate_constraints`** against LO **canonical graphs** only (pending MR proposals excluded).
+2. If `conforms: true` — proceed.
+3. If `conforms: false` — analyze `violations` immediately. **Do not ignore validations.**
+
+## Tool Patterns
+
+### `ingest_case_facts`
+
+Register high-density structural facts (imports, hook throttle rates, service abstractions):
+
+```turtle
+@prefix app: <http://app.local/vocabulary#> .
+
+app:PaymentController a app:RestController ;
+    app:route "/api/v1/payments" ;
+    app:dependsOn app:StripeGatewayService ;
+    app:executionTimeoutMs 5000 .
+```
+
+### `query_semantic_graph`
+
+Use compact SPARQL instead of recursive directory search to locate patterns and relationships.
+
+### Violations — fix or propose exception
+
+1. **Refactor code** to conform to the shape, re-ingest, re-validate.
+2. **`propose_local_exception`** when bypass is justified — then prompt developer:
+   `approve km://case/active-exceptions/{exception-id}`
+3. On approval: **`approve_local_exception`**, then re-validate.
+
+### Semantic MR promotion (curator mode)
+
+When a local pattern should become global LO policy:
+
+1. **`propose_semantic_mr`** with `diff_insertions` / `diff_deletions` (target binding needs `mode: "curator"`).
+2. Prompt developer: `approve .km/mrs/mr-{ontology}-{id}.md`
+3. **`approve_semantic_mr`** with `doc_identifier` when developer approves.
+4. **`get_system_status`** — confirm LO cache refreshed.
