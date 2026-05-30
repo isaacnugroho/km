@@ -115,23 +115,45 @@ sequenceDiagram
 
 **Purpose:** Promote a localized structural pattern to the global static Learning Ontologies to evolve the shared organizational knowledge base.
 
+```mermaid
+sequenceDiagram
+    participant Agent
+    participant MCP as KM MCP Server
+    participant Human as Developer
+
+    Agent->>MCP: propose_semantic_mr(target_ontology, rationale, diff)
+    MCP-->>Agent: { mr_id, status: PENDING }
+    Agent->>Human: Prompts: approve .km/mrs/mr-042.md
+    Human->>Agent: approve .km/mrs/mr-042.md
+    Agent->>MCP: approve_semantic_mr(doc_identifier)
+    MCP-->>Agent: { status: APPROVED, mr_id, target_ontology, timestamp }
+    Agent->>MCP: get_system_status()
+```
+
 ### Execution Steps
 1.  **Draft Semantic Changes:** Write the structural Turtle modifications.
     *   `diff_insertions`: New OWL classes, properties, or SHACL constraint shapes.
     *   `diff_deletions`: Deprecated structural properties or shapes.
 2.  **Submit Propose Command:** Call `propose_semantic_mr`.
-3.  **Generate Workspace Review Document:** Ensure a structured markdown Merge Request document is generated at `docs/mrs/mr-<mr-id>.md` containing:
+3.  **Generate Workspace Review Document:** Ensure a structured markdown Merge Request document is generated at `.km/mrs/mr-<mr-id>.md` containing:
     *   Human-readable metadata.
-    *   The `approve` CLI command path.
+    *   The `approve <doc name>` command path (the agent will call `approve_semantic_mr` when the developer runs it).
     *   A structured summary of engineering rationale.
     *   Standard `diff` blocks containing the Turtle serialization edits.
 4.  **Instruct the Human:**
     > [!IMPORTANT]
     > **Semantic Knowledge Promotion Submitted!**
-    > A new semantic Merge Request has been materialized at [docs/mrs/mr-react-conventions-042.md](file:///werkz/personal/km/docs/mrs/mr-react-conventions-042.md).
+    > A new semantic Merge Request has been materialized at `.km/mrs/mr-react-conventions-042.md`.
     > 
     > Please review the changes and run the following command to finalize:
     > ```
-    > approve docs/mrs/mr-react-conventions-042.md
+    > approve .km/mrs/mr-react-conventions-042.md
     > ```
-5.  **Reload Memory System:** Upon the developer's execution of the approval, invoke `get_system_status` to clear and reload in-memory global caches on the active MCP instance.
+5.  **Apply Approval:** When the developer submits the approval command, invoke `approve_semantic_mr`:
+    ```python
+    mcp_client.call_tool(
+        "approve_semantic_mr",
+        {"doc_identifier": ".km/mrs/mr-react-conventions-042.md"},
+    )
+    ```
+6.  **Reload Memory System:** On `{ "status": "APPROVED" }`, invoke `get_system_status` to confirm in-memory global caches are reloaded on the active MCP instance.

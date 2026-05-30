@@ -30,7 +30,9 @@ Adding knowledge to the learning ontology involves the following steps:
 >     ```
 >     approve <doc name>
 >     ```
->     *(e.g., `approve km://mr/react-conventions/mr-402` or `approve docs/mrs/add-high-frequency-throttle-shape.md`)*
+>     *(e.g., `approve km://mr/react-conventions/mr-402` or `approve .km/mrs/mr-react-conventions-042.md`)*
+> 
+>     The agent translates this command into an `approve_semantic_mr` MCP tool call (see MCP Tools below).
 
 ## The Case Ontology
 
@@ -72,7 +74,7 @@ How are logical contradictions and rule violations managed?
 
 ## MCP Server Interface
 
-The KM MCP Server exposes a standard set of Tools and Resources to the host agent, enabling seamless reading, writing, validation, and human-in-the-loop control of the semantic graph.
+The KM MCP Server exposes eight Tools and three Resources to the host agent, enabling seamless reading, writing, validation, and human-in-the-loop control of the semantic graph.
 
 ### 1. MCP Tools
 
@@ -85,6 +87,7 @@ The KM MCP Server exposes a standard set of Tools and Resources to the host agen
 | `query_semantic_graph`    | `query` (SPARQL query string)                                                                        | SPARQL Select/Ask Result (JSON)                                                              | Executes a read-only SPARQL query over the merged active Case named graph and all imported global Learning Ontologies.                                                                       |
 | `propose_semantic_mr`     | `target_ontology` (URI), `rationale` (string), `diff_insertions` (Turtle), `diff_deletions` (Turtle) | `{ "mr_id": URI, "status": "PENDING" }`                                                      | Initiates the promotion of locally discovered patterns or exceptions by creating a semantic Merge Request in the system's meta-graph.                                                        |
 | `get_system_status`       | *None*                                                                                               | `{ "active_branch": string, "learning_ontologies": [URI], "pending_exceptions_count": int }` | Returns runtime environmental state, loaded ontologies, and active pending exceptions.                                                                                                       |
+| `approve_semantic_mr`     | `doc_identifier` (string)                                                                            | `{ "status": "APPROVED", "mr_id": URI, "target_ontology": URI, "timestamp": string }`        | Records human approval of a pending semantic Merge Request, applies its RDF diff to the target Learning Ontology, and reloads the in-memory ontology cache. Invoked by the agent after the developer issues `approve <doc name>`. |
 
 ### 2. MCP Resources
 

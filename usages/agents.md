@@ -148,6 +148,13 @@ When a local pattern or structural extension proves to be globally useful, promo
 
 1.  **Draft Diff:** Assemble standard Turtle insertions and deletions (`diff_insertions` and `diff_deletions`).
 2.  **Submit MR:** Invoke `propose_semantic_mr` passing the target ontology and structural rationale.
-3.  **Generate Review File:** The system will output a markdown review file under `docs/mrs/` (or expose it as a virtual resource).
-4.  **Await Approval:** Stop your autonomous loop and request the developer to run `approve <mr-file-path>`.
-5.  **Re-align:** Once approved, invoke `get_system_status` to ensure your in-memory ontology caches are synchronized.
+3.  **Generate Review File:** The system outputs a markdown review file under `.km/mrs/` (or exposes it as a virtual resource).
+4.  **Await Approval:** Stop your autonomous loop and request the developer to run `approve <mr-file-path>` (e.g., `approve .km/mrs/mr-react-conventions-042.md`).
+5.  **Apply Approval:** When the developer submits the approval command, parse the `doc_identifier` and invoke `approve_semantic_mr`:
+    ```python
+    mcp_client.call_tool(
+        "approve_semantic_mr",
+        {"doc_identifier": ".km/mrs/mr-react-conventions-042.md"},
+    )
+    ```
+6.  **Re-align:** On `{ "status": "APPROVED" }`, invoke `get_system_status` to confirm in-memory ontology caches are synchronized.

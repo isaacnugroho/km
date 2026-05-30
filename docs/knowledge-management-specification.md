@@ -59,7 +59,8 @@ workspace-root/
 │   └── refs/                    # Branch refs tracking
 ├── .km/                         # Local KM Workspace directory (Git ignored)
 │   ├── config.json              # Workspace-specific configuration
-│   └── case_quads.db            # High-performance sqlite-based quad-store
+│   ├── case_quads.db            # High-performance sqlite-based quad-store
+│   └── mrs/                     # Semantic Merge Request review documents
 └── docs/
     └── knowledge-management-specification.md
 ```
@@ -134,7 +135,7 @@ Running a comprehensive SHACL validation (`pyshacl`) on large graphs on every in
 
 ## 4. MCP Server Interface: Tools & Resources Specifications
 
-The KM MCP Server exposes a standard interface enabling reading, writing, validation, and human-in-the-loop control.
+The KM MCP Server exposes a standard interface enabling reading, writing, validation, and human-in-the-loop control via **eight MCP tools** and **three MCP resources**.
 
 ### 4.1 MCP Tools Specification
 
@@ -310,6 +311,35 @@ Returns environmental and memory states of the KM daemon.
         "pending_exceptions_count": { "type": "integer" }
       },
       "required": ["active_branch", "learning_ontologies", "pending_exceptions_count"]
+    }
+    ```
+
+#### 8. `approve_semantic_mr`
+Records human approval of a pending semantic Merge Request and applies its RDF diff to the target Learning Ontology. The agent invokes this tool after the developer issues the `approve <doc name>` command in chat.
+*   **Parameters Schema:**
+    ```json
+    {
+      "type": "object",
+      "properties": {
+        "doc_identifier": {
+          "type": "string",
+          "description": "Relative file path (e.g. .km/mrs/mr-react-conventions-042.md) or MCP URI (e.g. km://mr/react-conventions/042)"
+        }
+      },
+      "required": ["doc_identifier"]
+    }
+    ```
+*   **Response Schema:**
+    ```json
+    {
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "enum": ["APPROVED"] },
+        "mr_id": { "type": "string" },
+        "target_ontology": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["status", "mr_id", "target_ontology", "timestamp"]
     }
     ```
 
@@ -497,21 +527,21 @@ def check_conformance(store: pyoxigraph.Store, active_graph_uri: str) -> tuple[b
 The promotion of dynamic Case facts into global Learning Ontologies is managed through a structured review and approval workflow to prevent database pollution and guarantee architectural governance.
 
 ### 7.1 Merge Request Document Structure
-When a semantic Merge Request (MR) is initiated (via the `propose_semantic_mr` tool), the system materializes a version-controlled markdown document in the workspace (e.g., in `.km/mrs/` or `docs/mrs/`) or as a virtual MCP Resource. This document MUST contain two distinct, highly structured sections:
+When a semantic Merge Request (MR) is initiated (via the `propose_semantic_mr` tool), the system materializes a markdown document in `.km/mrs/` (or exposes it as a virtual MCP Resource). This document MUST contain two distinct, highly structured sections:
 
 1.  **Summary of Changes:**
-    *   **Metadata:** MR ID, target ontology URI, author signature, timestamp, and the **exact human approval command** (e.g., `**Approval Command:** approve docs/mrs/mr-react-conventions-042.md`).
+    *   **Metadata:** MR ID, target ontology URI, author signature, timestamp, and the **exact human approval command** (e.g., `**Approval Command:** approve .km/mrs/mr-react-conventions-042.md`). The agent will translate this command into an `approve_semantic_mr` MCP tool call on the developer's behalf.
     *   **Rationale:** Detailed engineering justification for promoting the knowledge (e.g., performance findings, structural optimizations).
     *   **High-Level Impact:** Summary of newly introduced/deprecated classes, relationships, and SHACL constraint shapes.
 2.  **Detailed Changes:**
     *   **Semantic Diff:** The exact RDF insertions and deletions representing structural modifications.
     *   **Diff Format:** Represented using a standard line-by-line diff block enclosing standard RDF Turtle syntax.
 
-#### Concrete Example: `docs/mrs/mr-react-conventions-042.md`
+#### Concrete Example: `.km/mrs/mr-react-conventions-042.md`
 ```markdown
 # Semantic Merge Request: MR-REACT-CONVENTIONS-042
 **Status:** PENDING_APPROVAL
-**Approval Command:** `approve docs/mrs/mr-react-conventions-042.md`
+**Approval Command:** `approve .km/mrs/mr-react-conventions-042.md`
 **Target Ontology:** `http://ontologies.react.org/core`
 **Created At:** 2026-05-30T02:30:00Z
 **Author:** ChefDev
@@ -549,46 +579,41 @@ Reviewing and applying the semantic MR diff is strictly gated by human approval.
 ```
 approve <doc name>
 ```
-*Where `<doc name>` refers to the relative file path of the MR document or its unique MCP Resource URI.*
+*Where `<doc name>` refers to the relative file path of the MR document (under `.km/mrs/`) or its unique MCP Resource URI.*
 
-#### Examples of Approved Input Prompts:
-*   `approve docs/mrs/mr-react-conventions-042.md`
+#### Examples of Developer Approval Prompts:
+*   `approve .km/mrs/mr-react-conventions-042.md`
 *   `approve km://mr/react-conventions/042`
 
-#### The Approval & Merging Algorithm
-When the agent or daemon detects the `approve <doc name>` prompt, it executes the following resolution loop:
+#### The Approval & Merging Workflow
+When the agent detects the `approve <doc name>` prompt in the developer's message, it invokes the `approve_semantic_mr` MCP tool:
 
 ```python
 import re
-import os
 
-def handle_human_command(prompt_input: str) -> str:
-    # 1. Parse approve command format
+def handle_developer_approval(prompt_input: str) -> dict:
+    # 1. Parse approve command format from developer message
     match = re.match(r"^approve\s+(.+)$", prompt_input.strip(), re.IGNORECASE)
     if not match:
-        return "Unknown command pattern."
-        
+        raise ValueError("Unknown command pattern.")
+
     doc_identifier = match.group(1).strip()
-    
-    # 2. Resolve the document path/URI to the corresponding Merge Request
-    mr_id, target_ontology_path, diff_content = resolve_mr_metadata(doc_identifier)
-    if not mr_id:
-        return f"Error: Could not locate a pending Merge Request matching '{doc_identifier}'."
-        
-    # 3. Apply the RDF diff to the target Learning Ontology file
-    try:
-        apply_semantic_diff(target_ontology_path, diff_content)
-    except Exception as e:
-        return f"Merge Failed: Error applying RDF diff: {str(e)}"
-        
-    # 4. Update the MR Status in the Case Meta-graph to APPROVED
-    register_mr_approval_in_graph(mr_id, approved_by="HumanDeveloper")
-    
-    # 5. Reload the active Learning Ontology Cache in memory
-    reload_learning_ontology_cache()
-    
-    return f"Success: Merge Request '{mr_id}' has been approved and successfully merged into '{target_ontology_path}'!"
+
+    # 2. Invoke the MCP tool (server-side: MergeRequestService)
+    result = mcp_client.call_tool(
+        "approve_semantic_mr",
+        {"doc_identifier": doc_identifier},
+    )
+    # Returns: { "status": "APPROVED", "mr_id": "...", "target_ontology": "...", "timestamp": "..." }
+    return result
 ```
 
-*   **Result:** This workflow binds human review to a structured documentation standard, and provides a simple, CLI/chat-native command interface (`approve <doc name>`) to enforce secure semantic graph evolution.
+The server-side `MergeRequestService` (invoked by the `approve_semantic_mr` tool) executes:
+
+1.  **Resolve** the `doc_identifier` to the corresponding pending Merge Request metadata.
+2.  **Apply** the RDF diff (`diff_insertions` / `diff_deletions`) to the target Learning Ontology `.ttl` file.
+3.  **Register** MR approval status (`APPROVED`) in the Case meta-graph.
+4.  **Reload** the in-memory Learning Ontology cache.
+
+*   **Result:** This workflow binds human review to a structured documentation standard. The developer uses a simple chat-native command (`approve <doc name>`), and the agent translates it into a typed MCP tool call that enforces secure semantic graph evolution.
 
