@@ -11,8 +11,8 @@ Unlike the recipe example, this simulation demonstrates the power of utilizing *
 We are adding a **Real-Time Collaborative Canvas** feature to an existing project. Multiple users can edit the canvas simultaneously, sending updates over a WebSocket connection.
 
 To build this safely, the system imports two separate Learning Ontologies to act as standard boundaries:
-1.  **Distributed Systems Ontology (`/ontologies/distributed-systems/`)**: Governs network protocols, message reliability, split-brain mitigation, and idempotency.
-2.  **React Hook Conventions Ontology (`/ontologies/react-conventions/`)**: Enforces React component memory safety, standard hook patterns, lifecycle cleanups, and performance limits.
+1.  **Distributed Systems Ontology** (`source: ../km-org-ontologies/distributed-systems`): Governs network protocols, message reliability, split-brain mitigation, and idempotency.
+2.  **React Hook Conventions Ontology** (`source: ../km-org-ontologies/react-conventions`): Enforces React component memory safety, standard hook patterns, lifecycle cleanups, and performance limits.
 
 ```mermaid
 graph TD
@@ -41,8 +41,20 @@ graph TD
     LocalException -.->|Bypasses| DS_Shape
 ```
 
-### 1.1 Learning Ontology A: Distributed Systems (`/ontologies/distributed-systems/`)
-Enforces design patterns that guarantee message consistency and prevent out-of-order message corruption.
+### 1.1 Learning Ontology A: Distributed Systems (external source package)
+Enforces design patterns that guarantee message consistency and prevent out-of-order message corruption. Lives in a separate repository at `../km-org-ontologies/distributed-systems/`.
+
+```
+../km-org-ontologies/distributed-systems/   ← separate Git repo (source)
+├── README.md
+├── config.json
+├── lo_quads.db              # runtime (Git ignored)
+└── exports/
+    ├── main.ttl             # canonical graph (Git tracked)
+    └── governance.ttl       # MR records (Git tracked)
+```
+
+Cached locally at `.km/lo-cache/distributed-systems/` in the workspace.
 
 #### `README.md`
 ```markdown
@@ -51,7 +63,7 @@ Enforces design patterns that guarantee message consistency and prevent out-of-o
 **Purpose:** Ensure state stability in distributed, real-time communication systems.
 ```
 
-#### SHACL Constraint Shape (Turtle)
+#### SHACL Constraint Shape (from `exports/main.ttl` / canonical graph)
 ```turtle
 # Ensures all write events over public transport have an Idempotency Key
 dist:IdempotentMessageShape a sh:NodeShape ;
@@ -71,8 +83,8 @@ dist:IdempotentMessageShape a sh:NodeShape ;
     ] .
 ```
 
-### 1.2 Learning Ontology B: React Hook Conventions (`/ontologies/react-conventions/`)
-Governs React frontend memory management, preventing connection leaks and memory corruption.
+### 1.2 Learning Ontology B: React Hook Conventions (external source package)
+Governs React frontend memory management, preventing connection leaks and memory corruption. Source at `../km-org-ontologies/react-conventions/`, cached at `.km/lo-cache/react-conventions/`.
 
 #### `README.md`
 ```markdown
@@ -81,7 +93,7 @@ Governs React frontend memory management, preventing connection leaks and memory
 **Purpose:** Enforce client-side memory safety and connection recycling.
 ```
 
-#### SHACL Constraint Shape (Turtle)
+#### SHACL Constraint Shape (from `exports/main.ttl` / canonical graph)
 ```turtle
 # Ensures any useEffect that establishes a persistent WebSocket closes it on unmount
 react:EffectCleanupShape a sh:NodeShape ;
@@ -105,12 +117,23 @@ The local Case Ontology is configured to import **both** global learning ontolog
 {
   "workspace_id": "realtime-canvas-dev",
   "learning_ontologies": [
-    "/ontologies/distributed-systems",
-    "/ontologies/react-conventions"
+    {
+      "ontology_id": "distributed-systems",
+      "source": "../km-org-ontologies/distributed-systems",
+      "mode": "read_only"
+    },
+    {
+      "ontology_id": "react-conventions",
+      "source": "../km-org-ontologies/react-conventions",
+      "mode": "curator"
+    }
   ],
   "quad_store": {
     "engine": "sqlite-quad",
     "storage_path": "./.km/case_quads.db"
+  },
+  "lo_cache": {
+    "base_path": "./.km/lo-cache"
   }
 }
 ```
@@ -261,14 +284,17 @@ This hook implements a smart throttling mechanism with immediate local optimisti
 Recognizing this as an excellent utility, the developer commands the agent: `"Promote this throttled socket hook pattern to the React Conventions learning ontology."`
 
 #### Creating the Semantic Merge Request (MR)
-The agent generates a semantic diff to suggest adding a new SHACL shape to enforce event throttling on high-frequency component hook outputs in `/ontologies/react-conventions/`.
+The agent calls `propose_semantic_mr` (curator mode on `react-conventions` binding), writing proposal quads to the **source** LO package:
+
+```
+Proposal graph:  http://km.local/learning-ontologies/react-conventions/mr/MR-042
+Governance graph: http://km.local/learning-ontologies/react-conventions/governance
+```
+
+The derived review document shows the diff against `exports/main.ttl`:
 
 ```diff
-diff --git a/ontologies/react-conventions/shapes.ttl b/ontologies/react-conventions/shapes.ttl
-index c38d12e..f89d31a 100644
---- a/ontologies/react-conventions/shapes.ttl
-+++ b/ontologies/react-conventions/shapes.ttl
-@@ -42,3 +42,12 @@
+@@ exports/main.ttl @@
 +# New SHACL Shape for Throttling High-Frequency Hooks
 +react:HighFrequencyThrottleShape a sh:NodeShape ;
 +    sh:targetClass react:HighFrequencyEventHook ;
@@ -281,22 +307,33 @@ index c38d12e..f89d31a 100644
 +    ] .
 ```
 
-This Semantic MR is reviewed and approved by the core engineering maintainer, immediately establishing the throttled design shape as a global constraint for all front-end developers in the repository.
+On curator approval (`approve .km/mrs/mr-react-conventions-042.md`), the proposal merges into the source canonical graph, `{source}/exports/` are regenerated, and the workspace cache at `.km/lo-cache/react-conventions/` is refreshed. Agents validate against the updated cached canonical graph only.
 
 ---
 
 ## 3. Version Control & Git Synchronization
 
-The local Case Ontology quad-store coordinates this dual-governance clean state across development branches:
+The local Case Ontology quad-store coordinates dual-governance across development branches. Each Learning Ontology is bound via `source` and materialized in `.km/lo-cache/`.
 
+#### Case Ontology Graph Registry
 ```
-Quad-Store Graph Registry:
 ┌────────────────────────────────────────────────────────┬──────────────────────────────────────────┐
 │ Context/Named Graph URI                                │ Git Branch Association                   │
 ├────────────────────────────────────────────────────────┼──────────────────────────────────────────┤
 │ http://km.local/graphs/main                            │ refs/heads/main                          │
 │ http://km.local/graphs/feature/collaborative-canvas    │ refs/heads/feature/collaborative-canvas  │
 └────────────────────────────────────────────────────────┴──────────────────────────────────────────┘
+```
+
+#### Learning Ontology Graph Registry (per ontology)
+```
+┌──────────────────────────────────────────────────────────────────────┬─────────────────────────────────────────┐
+│ Named Graph URI                                                      │ Purpose                                 │
+├──────────────────────────────────────────────────────────────────────┼─────────────────────────────────────────┤
+│ http://km.local/learning-ontologies/react-conventions/canonical    │ Approved shapes (agent-visible)         │
+│ http://km.local/learning-ontologies/react-conventions/governance   │ MR lifecycle records                    │
+│ http://km.local/learning-ontologies/react-conventions/mr/MR-042    │ Pending throttling shape proposal       │
+└──────────────────────────────────────────────────────────────────────┴─────────────────────────────────────────┘
 ```
 
 1.  **Branch Switch (`git checkout main`)**:

@@ -33,8 +33,8 @@ You MUST integrate KM MCP tool operations into your standard execution loop at s
 
 ### Phase 1: Context Ingestion & Alignment (On Startup / Task Start)
 Before writing any code or proposing plans, align your context window with the workspace's loaded ontologies:
-1.  **Retrieve System Status:** Invoke `get_system_status` to determine the active Git branch and the loaded Learning Ontologies.
-2.  **Inspect Active Schemas:** Read the schema resource at `km://schemas/learning-ontologies` to understand available classes, properties, and constraint boundaries.
+1.  **Retrieve System Status:** Invoke `get_system_status` to determine the active Git branch and the loaded Learning Ontology bindings (ontology_id, source, mode, cache sync state).
+2.  **Inspect Active Schemas:** Read the schema resource at `km://schemas/learning-ontologies` to understand available classes, properties, and constraint boundaries (sourced from cached LO **canonical graphs** only).
 3.  **Read Case Triples:** Load `km://case/active-graph` or execute targeted SPARQL read queries (`query_semantic_graph`) to understand what structural facts have already been established for this branch.
 
 ### Phase 2: Fact Discovery & Ingestion (During Development)
@@ -47,7 +47,7 @@ As you write code (e.g., creating components, modules, endpoints, or data models
 > Do not dump raw file contents into `ingest_case_facts`. Extract high-density structural facts such as dependency imports, event hook throttle rates, or service layer abstractions.
 
 ### Phase 3: Constraint Verification (Before Turn End / Planning Completion)
-Before completing a task or presenting a completed change to the developer, verify system compliance:
+Before completing a task or presenting a completed change to the developer, verify system compliance against LO **canonical graphs** only (pending MR proposals are excluded):
 1.  **Run SHACL Linter:** Invoke `validate_constraints`.
 2.  **Interpret Validation Report:**
     *   If `conforms` is `true`, proceed with confidence.
@@ -147,8 +147,8 @@ mcp_client.call_tool(
 When a local pattern or structural extension proves to be globally useful, promote it to a static **Learning Ontology** via the semantic Merge Request pipeline:
 
 1.  **Draft Diff:** Assemble standard Turtle insertions and deletions (`diff_insertions` and `diff_deletions`).
-2.  **Submit MR:** Invoke `propose_semantic_mr` passing the target ontology and structural rationale.
-3.  **Generate Review File:** The system outputs a markdown review file under `.km/mrs/` (or exposes it as a virtual resource).
+2.  **Submit MR:** Invoke `propose_semantic_mr` passing the target ontology and structural rationale. Requires `mode: "curator"` on the target binding. Proposal quads are written to the **source** LO package; a derived review document is generated in `.km/mrs/`.
+3.  **Review File (Derived):** The system generates a markdown review file under `.km/mrs/` from governance triples (or exposes it as `km://mr/{ontology-id}/{mr-id}`).
 4.  **Await Approval:** Stop your autonomous loop and request the developer to run `approve <mr-file-path>` (e.g., `approve .km/mrs/mr-react-conventions-042.md`).
 5.  **Apply Approval:** When the developer submits the approval command, parse the `doc_identifier` and invoke `approve_semantic_mr`:
     ```python
@@ -157,4 +157,4 @@ When a local pattern or structural extension proves to be globally useful, promo
         {"doc_identifier": ".km/mrs/mr-react-conventions-042.md"},
     )
     ```
-6.  **Re-align:** On `{ "status": "APPROVED" }`, invoke `get_system_status` to confirm in-memory ontology caches are synchronized.
+6.  **Re-align:** On `{ "status": "APPROVED" }`, invoke `get_system_status` to confirm the workspace LO cache is refreshed and the canonical graph cache is synchronized.

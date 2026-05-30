@@ -10,22 +10,27 @@ KM is MCP tool for managing agent knowledge/memory to prevent hallucination and 
 ## The Learning Ontologies
 
 Learning ontologies are collection of knowledge organized or categorized by domain. Each learning ontology:
-- Stored in a directory
-- A README.md file in the directory that describes the purpose of the ontology
+- Lives in a **self-contained source package** at an arbitrary filesystem path (sibling repo, submodule, system path, etc.) — not required to be inside the workspace
+- Referenced by the workspace via an **object binding** in `.km/config.json` (`ontology_id`, `source`, `mode`)
+- Materialized locally in `.km/lo-cache/{ontology-id}/` for runtime validation and query
+- A `README.md` file in the source package that describes the purpose of the ontology
+- Git-tracked Turtle exports in `{source}/exports/main.ttl` (canonical state) and `{source}/exports/governance.ttl` (MR records); database files are runtime-only and Git-ignored
 - Should be self contained with all neccessary classes and relationship and can be used independently
+- Agents validate and query against the **cached canonical named graph only**; pending MR proposal graphs are excluded
 
 Adding knowledge to the learning ontology involves the following steps:
 1. Identify new concepts and relationships.
-2. Create a merge request with a semantic diff to add the new concepts and relationships to the ontology.
-3. Human reviews and approves the merge request.
-4. The ontology is updated with the new concepts and relationships only after the merge request is approved.
+2. Create a merge request with a semantic diff — recorded in the LO governance graph and a proposal named graph inside `lo_quads.db`.
+3. Human reviews and approves the merge request (via generated review document or governance export).
+4. The canonical graph is updated only after approval; `exports/main.ttl` and `exports/governance.ttl` are regenerated for Git commit.
 
 > [!NOTE]
-> **Domain-Specific Merge Requests:** A "Merge Request" (MR) within the KM system is an *internal, semantic-level concept* rather than a Git/GitHub/GitLab hosting platform PR/MR. While it conceptually mirrors the propose-review-approve-merge lifecycle, it is executed and tracked entirely within the KM system's hyper-graph itself.
+> **Domain-Specific Merge Requests:** A "Merge Request" (MR) within the KM system is an *internal, semantic-level concept* rather than a Git/GitHub/GitLab hosting platform PR/MR. While it conceptually mirrors the propose-review-approve-merge lifecycle, it is executed and tracked entirely within the target Learning Ontology's quad-store governance graph.
 > 
-> *   **Document Structure:** Each Merge Request is represented as a structured semantic document containing two key sections:
->     1.  **Summary of Changes:** A human-readable section outlining the metadata (including the **exact approval command** to run, target ontology, author, and date), engineering rationale, targeted concepts, and high-level structural impact.
->     2.  **Detailed Changes:** The exact technical diff specifying the RDF `diff_insertions` and `diff_deletions` in Turtle serialization.
+> *   **Authoritative Record:** Each MR is stored as RDF triples in the LO governance named graph (`http://km.local/learning-ontologies/{id}/governance`) with proposal quads in a dedicated MR graph. Git-tracked `exports/governance.ttl` mirrors this state.
+> *   **Review Document (Derived):** A human-readable markdown view is generated at `.km/mrs/mr-<mr-id>.md` containing:
+>     1.  **Summary of Changes:** Metadata (including the **exact approval command** to run, target ontology, author, and date), engineering rationale, targeted concepts, and high-level structural impact.
+>     2.  **Detailed Changes:** The exact technical diff specifying the RDF `diff_insertions` and `diff_deletions` in Turtle serialization (diffed against `exports/main.ttl`).
 > *   **Human Approval Interface:** The approval is finalized by the human developer issuing the explicit command/prompt:
 >     ```
 >     approve <doc name>
@@ -37,14 +42,28 @@ Adding knowledge to the learning ontology involves the following steps:
 ## The Case Ontology
 
 Case ontologies:
-- Located in the workspace/working directory
-- Has ontology of learning ontologies being used in the workspace, configured by a config file
+- Located in the workspace/working directory (`.km/case_quads.db`)
+- References learning ontologies via **object bindings** in `.km/config.json`, not by requiring LO directories in the workspace tree
 - Has knowledge related to the current problem/case being solved, including the facts, concepts, relationship, rules and process being applied
 - Each "how" knowledge i.e. the "how" part of the solution should be linked to the related learning ontologies knowledge
 - It is allowed to add exception for not following a learning ontology knowledge, with proper documentation and rationale
 - Constructed as quad-store to allow named graph according to the repository branch
 
-Human can initiate promoting knowledge from the case ontology to learning ontologies which will be handled as a merge request to the learning ontology
+Human can initiate promoting knowledge from the case ontology to learning ontologies which will be handled as a merge request to the learning ontology (requires `mode: "curator"` on the target binding).
+
+#### Workspace LO Binding Example (`.km/config.json`)
+```json
+{
+  "learning_ontologies": [
+    {
+      "ontology_id": "react-conventions",
+      "source": "../km-org-ontologies/react-conventions",
+      "mode": "read_only"
+    }
+  ],
+  "lo_cache": { "base_path": "./.km/lo-cache" }
+}
+```
 
 ## Knowledge Lifecycle & Evolution
 
@@ -61,6 +80,11 @@ Who owns, validates, and authors the semantic graph?
 
 The Case Ontology is not synchronized with the source code repository. The Case Ontology is specific to a workspace and is not version controlled in the same way as the source code repository.
 
+Learning Ontologies use a split model across source packages and workspace cache:
+- **Source package** (`{source}/`): `lo_quads.db` is runtime-only (Git ignored); `exports/main.ttl` and `exports/governance.ttl` are Git-tracked authoritative snapshots.
+- **Workspace cache** (`.km/lo-cache/{ontology-id}/`): synced from source exports on startup; used for all agent reads and validation.
+- **Bindings** specify `ontology_id`, `source` path, and `mode` (`read_only` or `curator`).
+
 - **Branch Switch Detection:** watch `.git/HEAD`
 - **Branch Inheritance & Fallback Logic:** The case ontology is cloned from the parent branch when a new branch is created.
 - **Workspace Portability & Porting:** Human should manualy copy/backup and restore the case ontology.
@@ -70,32 +94,34 @@ The Case Ontology is not synchronized with the source code repository. The Case 
 
 How are logical contradictions and rule violations managed?
 - **Cross-Ontology Contradictions:** Human should review and resolve contradictions. The system should flag these contradictions to the human for review.
-- **Constraint Enforcement (SHACL):** The system acts as a hard "linter" powered by **SHACL (Shapes Constraint Language)** shapes, validating graph states and halting agent execution on un-excepted constraint violations.
+- **Constraint Enforcement (SHACL):** The system acts as a hard "linter" powered by **SHACL (Shapes Constraint Language)** shapes from LO **canonical graphs**, validating graph states and halting agent execution on un-excepted constraint violations. Pending MR proposal graphs never participate in validation.
 
 ## MCP Server Interface
 
-The KM MCP Server exposes eight Tools and three Resources to the host agent, enabling seamless reading, writing, validation, and human-in-the-loop control of the semantic graph.
+The KM MCP Server exposes eight Tools and five Resources to the host agent, enabling seamless reading, writing, validation, and human-in-the-loop control of the semantic graph.
 
 ### 1. MCP Tools
 
 | Tool Name                 | Parameters                                                                                           | Returns                                                                                      | Description                                                                                                                                                                                  |
 | :------------------------ | :--------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ingest_case_facts`       | `facts` (JSON-LD or Turtle string), `format` (string)                                                | `{ "status": "success", "triples_added": int }`                                              | Ingests new contextual facts, concepts, and relationships from the active case into the named graph mapped to the active branch.                                                             |
-| `validate_constraints`    | *None*                                                                                               | `{ "conforms": bool, "violations": [Violation] }`                                            | Runs SHACL validation on the active named graph against shapes imported from configured Learning Ontologies. Halts execution if violations are found and no approved local exception exists. |
+| `validate_constraints`    | *None*                                                                                               | `{ "conforms": bool, "violations": [Violation] }`                                            | Runs SHACL validation on the active named graph against shapes from LO **canonical graphs** only. Halts execution if violations are found and no approved local exception exists. |
 | `propose_local_exception` | `bypasses_shape` (URI), `target_node` (URI), `rationale` (string)                                    | `{ "exception_id": URI, "status": "PENDING_APPROVAL" }`                                      | Declares a local exception to bypass a specific SHACL shape for a given focus node. Returns details so the agent can prompt the human developer.                                             |
 | `approve_local_exception` | `exception_id` (URI), `approver` (string), `signature` (string)                                      | `{ "status": "APPROVED", "timestamp": string }`                                              | Records human approval signature and timestamp, enabling the SHACL linter to bypass the specified shape constraint.                                                                          |
-| `query_semantic_graph`    | `query` (SPARQL query string)                                                                        | SPARQL Select/Ask Result (JSON)                                                              | Executes a read-only SPARQL query over the merged active Case named graph and all imported global Learning Ontologies.                                                                       |
-| `propose_semantic_mr`     | `target_ontology` (URI), `rationale` (string), `diff_insertions` (Turtle), `diff_deletions` (Turtle) | `{ "mr_id": URI, "status": "PENDING" }`                                                      | Initiates the promotion of locally discovered patterns or exceptions by creating a semantic Merge Request in the system's meta-graph.                                                        |
-| `get_system_status`       | *None*                                                                                               | `{ "active_branch": string, "learning_ontologies": [URI], "pending_exceptions_count": int }` | Returns runtime environmental state, loaded ontologies, and active pending exceptions.                                                                                                       |
-| `approve_semantic_mr`     | `doc_identifier` (string)                                                                            | `{ "status": "APPROVED", "mr_id": URI, "target_ontology": URI, "timestamp": string }`        | Records human approval of a pending semantic Merge Request, applies its RDF diff to the target Learning Ontology, and reloads the in-memory ontology cache. Invoked by the agent after the developer issues `approve <doc name>`. |
+| `query_semantic_graph`    | `query` (SPARQL query string)                                                                        | SPARQL Select/Ask Result (JSON)                                                              | Executes a read-only SPARQL query over the merged active Case named graph and LO **canonical graphs** only.                                                                                  |
+| `propose_semantic_mr`     | `target_ontology` (URI), `rationale` (string), `diff_insertions` (Turtle), `diff_deletions` (Turtle) | `{ "mr_id": URI, "status": "PENDING" }`                                                      | Creates a semantic MR in the **source** LO store (requires `mode: "curator"`); generates a derived review document in `.km/mrs/`. |
+| `get_system_status`       | *None*                                                                                               | `{ "active_branch": string, "learning_ontologies": [Binding], "pending_exceptions_count": int, "pending_mrs_count": int }` | Returns runtime state including resolved LO bindings (ontology_id, source, mode, cache_path, cache_synced_at), pending exceptions, and pending MRs. |
+| `approve_semantic_mr`     | `doc_identifier` (string)                                                                            | `{ "status": "APPROVED", "mr_id": URI, "target_ontology": URI, "timestamp": string }`        | Merges in **source** LO store (requires `mode: "curator"`), regenerates source exports, refreshes workspace cache, reloads in-memory LO cache. |
 
 ### 2. MCP Resources
 
 The server exposes read-only structural data to the host agent to clarify schema definitions and active states:
 
-- **`km://schemas/learning-ontologies`**: Retrieves metadata and schemas for all active global Learning Ontologies configured in `.km/config.json`.
+- **`km://schemas/learning-ontologies`**: Retrieves metadata and schemas for all active global Learning Ontologies (canonical graphs only), configured in `.km/config.json`.
 - **`km://case/active-graph`**: Returns the complete serialized RDF model of the current Git branch's named graph.
 - **`km://case/active-exceptions`**: Lists all active local exceptions (both pending and approved) registered for the current workspace.
+- **`km://learning-ontologies/{ontology-id}/canonical`**: Returns the serialized canonical graph for a specific Learning Ontology.
+- **`km://learning-ontologies/{ontology-id}/governance`**: Returns MR governance records for a specific Learning Ontology (curator review).
 
 ## Implementation
 

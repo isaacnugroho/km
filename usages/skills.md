@@ -54,7 +54,7 @@ graph TD
 
 ## Skill 2: The Continuous SHACL Linter Cycle (Validation)
 
-**Purpose:** Execute continuous constraint validation after any symbolic code edit to guarantee immediate alignment with structural constraints.
+**Purpose:** Execute continuous constraint validation after any symbolic code edit to guarantee immediate alignment with structural constraints from LO **canonical graphs** only.
 
 ### Execution Steps
 1.  **Trigger Validation:** Call `validate_constraints` immediately after any local code edit or file generation.
@@ -119,13 +119,17 @@ sequenceDiagram
 sequenceDiagram
     participant Agent
     participant MCP as KM MCP Server
+    participant LO as LO lo_quads.db
     participant Human as Developer
 
     Agent->>MCP: propose_semantic_mr(target_ontology, rationale, diff)
+    MCP->>LO: Write proposal graph + governance triples (source package)
+    MCP->>MCP: Generate derived review doc .km/mrs/mr-042.md
     MCP-->>Agent: { mr_id, status: PENDING }
     Agent->>Human: Prompts: approve .km/mrs/mr-042.md
     Human->>Agent: approve .km/mrs/mr-042.md
     Agent->>MCP: approve_semantic_mr(doc_identifier)
+    MCP->>LO: Merge proposal → canonical; regenerate exports/
     MCP-->>Agent: { status: APPROVED, mr_id, target_ontology, timestamp }
     Agent->>MCP: get_system_status()
 ```
@@ -134,12 +138,12 @@ sequenceDiagram
 1.  **Draft Semantic Changes:** Write the structural Turtle modifications.
     *   `diff_insertions`: New OWL classes, properties, or SHACL constraint shapes.
     *   `diff_deletions`: Deprecated structural properties or shapes.
-2.  **Submit Propose Command:** Call `propose_semantic_mr`.
-3.  **Generate Workspace Review Document:** Ensure a structured markdown Merge Request document is generated at `.km/mrs/mr-<mr-id>.md` containing:
+2.  **Submit Propose Command:** Call `propose_semantic_mr`. Requires `mode: "curator"` on the target binding. The server writes proposal quads to the **source** LO package's `mr/{mr-id}` graph and MR metadata to the source governance graph.
+3.  **Review Document (Derived):** The system generates a markdown review document at `.km/mrs/mr-<mr-id>.md` from governance triples, containing:
     *   Human-readable metadata.
     *   The `approve <doc name>` command path (the agent will call `approve_semantic_mr` when the developer runs it).
     *   A structured summary of engineering rationale.
-    *   Standard `diff` blocks containing the Turtle serialization edits.
+    *   Standard `diff` blocks against `exports/main.ttl` containing the Turtle serialization edits.
 4.  **Instruct the Human:**
     > [!IMPORTANT]
     > **Semantic Knowledge Promotion Submitted!**
@@ -156,4 +160,4 @@ sequenceDiagram
         {"doc_identifier": ".km/mrs/mr-react-conventions-042.md"},
     )
     ```
-6.  **Reload Memory System:** On `{ "status": "APPROVED" }`, invoke `get_system_status` to confirm in-memory global caches are reloaded on the active MCP instance.
+6.  **Reload Memory System:** On `{ "status": "APPROVED" }`, invoke `get_system_status` to confirm the workspace LO cache (`.km/lo-cache/`) is refreshed from source exports and the in-memory canonical cache is reloaded.

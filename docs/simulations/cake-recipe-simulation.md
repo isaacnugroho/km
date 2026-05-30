@@ -36,8 +36,18 @@ graph TD
     CO_Exception -.->|Bypasses / Extends| LO_Rule1
 ```
 
-### 1.1 The Learning Ontology (`/ontologies/baking/`)
-This is the global, shared, version-controlled repository of baking science. It contains domain classes, properties, and core thermodynamic/chemical axioms.
+### 1.1 The Learning Ontology (external source package)
+This is the global, shared, version-controlled repository of baking science at `../km-org-ontologies/baking/`. Cached locally at `.km/lo-cache/baking/`.
+
+```
+../km-org-ontologies/baking/   ← separate Git repo (source)
+├── README.md
+├── config.json
+├── lo_quads.db              # runtime (Git ignored)
+└── exports/
+    ├── main.ttl             # canonical graph (Git tracked)
+    └── governance.ttl       # MR records (Git tracked)
+```
 
 #### `README.md` (Ontology Declaration)
 ```markdown
@@ -46,7 +56,7 @@ This is the global, shared, version-controlled repository of baking science. It 
 **Purpose:** Ensure standard safety, structural integrity, and structural metrics across all recipe-generation agents.
 ```
 
-#### Core Axioms & Rules (Represented in Turtle/Turtle-like logic)
+#### Core Axioms & Rules (from `exports/main.ttl` / canonical graph)
 ```turtle
 # Class Definitions
 baking:Ingredient a owl:Class .
@@ -90,11 +100,18 @@ The local Case Ontology captures the situational realities of our active recipe 
 {
   "workspace_id": "lavender-cocoa-chiffon-dev",
   "learning_ontologies": [
-    "/ontologies/baking"
+    {
+      "ontology_id": "baking",
+      "source": "../km-org-ontologies/baking",
+      "mode": "curator"
+    }
   ],
   "quad_store": {
     "engine": "sqlite-quad",
     "storage_path": "./.km/case_quads.db"
+  },
+  "lo_cache": {
+    "base_path": "./.km/lo-cache"
   }
 }
 ```
@@ -141,7 +158,7 @@ The agent registers these facts into the active Git branch named graph `http://k
 
 ### Phase 2: The Logical Linter in Action (SHACL Validation Halting)
 
-Before running the recipe simulation or outputting the kitchen instructions, the KM MCP **SHACL Validator** executes a semantic check on the active named graph against the shapes defined in `/ontologies/baking/`.
+Before running the recipe simulation or outputting the kitchen instructions, the KM MCP **SHACL Validator** executes a semantic check on the active named graph against the shapes from the cached baking LO canonical graph (synced from `../km-org-ontologies/baking/exports/main.ttl`).
 
 The linter detects a severe SHACL validation failure:
 1.  `recipe:ingredients/cocoa_powder` is classified as `baking:Lipid` due to its high cocoa butter content.
@@ -246,17 +263,20 @@ The agent, analyzing physical parameters or receiving test kitchen feedback ("Me
 *   Adding **Cream of Tartar (Potassium Bitartrate - Acid)** lowers the pH of the egg whites.
 *   This protonates the ovalbumin proteins, making them resist unfolding too quickly, which effectively *shields* the bubbles from Linalool surfactant breakdown.
 
-This is a **major baking science discovery** that is not currently in the global `/ontologies/baking/` Learning Ontology. The developer instructs the agent: `"Promote this lavender meringue stabilization technique to the global baking ontology."`
+This is a **major baking science discovery** that is not currently in the global baking Learning Ontology (`ontology_id: "baking"`). The developer instructs the agent: `"Promote this lavender meringue stabilization technique to the global baking ontology."`
 
 #### Creating the Semantic Merge Request (MR)
-The agent generates an internal semantic diff to suggest adding this concept and rule to the global domain.
+The agent calls `propose_semantic_mr` (curator mode), writing proposal quads to the **source** baking LO package at `../km-org-ontologies/baking/`:
+
+```
+Proposal graph:  http://km.local/learning-ontologies/baking/mr/MR-017
+Governance graph: http://km.local/learning-ontologies/baking/governance
+```
+
+The derived review document shows the diff against `exports/main.ttl`:
 
 ```diff
-diff --git a/ontologies/baking/rules.ttl b/ontologies/baking/rules.ttl
-index a4f7a2c..b89d4e1 100644
---- a/ontologies/baking/rules.ttl
-+++ b/ontologies/baking/rules.ttl
-@@ -12,4 +12,14 @@
+@@ exports/main.ttl @@
 +# New Concept
 +baking:TerpeneSurfactant rdfs:subClassOf baking:Lipid .
 +baking:Linalool rdfs:subClassOf baking:TerpeneSurfactant .
@@ -278,22 +298,33 @@ index a4f7a2c..b89d4e1 100644
 ```
 
 #### Review & Governance Cycle
-The Semantic MR is logged in the system. The curator of the `Baking & Patisserie` learning ontology reviews this semantic diff, reviews the physical test reports, and signs off. Once merged, **any other agent** in the organization creating citrus, floral, or lavender chiffon cakes will automatically inherit this stabilization rule.
+The Semantic MR is recorded in the source baking LO governance graph and exported to `{source}/exports/governance.ttl`. The curator reviews the derived markdown document and physical test reports, then approves via `approve .km/mrs/mr-baking-017.md`. On merge, proposal quads flow into the source canonical graph, `{source}/exports/main.ttl` is regenerated, the workspace cache at `.km/lo-cache/baking/` is refreshed, and **any other agent** creating citrus, floral, or lavender chiffon cakes inherits the stabilization rule.
 
 ---
 
 ## 3. Version Control & State Synchronization
 
-Because the Case Ontology is structured as a **Quad-Store**, every fact and assertion belongs to a specific named graph linked directly to the repository's Git branch structure.
+Because the Case Ontology is structured as a **Quad-Store**, every fact and assertion belongs to a specific named graph linked directly to the repository's Git branch structure. Learning Ontologies are bound via `source` paths and materialized in `.km/lo-cache/`; Git tracks exports in the LO source repositories.
 
+#### Case Ontology Graph Registry
 ```
-Quad-Store Graph Registry:
 ┌────────────────────────────────────────────────────────┬──────────────────────────────────────────┐
 │ Context/Named Graph URI                                │ Git Branch Association                   │
 ├────────────────────────────────────────────────────────┼──────────────────────────────────────────┤
 │ http://km.local/graphs/main                            │ refs/heads/main                          │
 │ http://km.local/graphs/feature/lavender-cocoa-chiffon  │ refs/heads/feature/lavender-cocoa-chiffon│
 └────────────────────────────────────────────────────────┴──────────────────────────────────────────┘
+```
+
+#### Baking LO Graph Registry
+```
+┌──────────────────────────────────────────────────────────────────────┬─────────────────────────────────────────┐
+│ Named Graph URI                                                      │ Purpose                                 │
+├──────────────────────────────────────────────────────────────────────┼─────────────────────────────────────────┤
+│ http://km.local/learning-ontologies/baking/canonical               │ Approved baking science (agent-visible) │
+│ http://km.local/learning-ontologies/baking/governance              │ MR lifecycle records                    │
+│ http://km.local/learning-ontologies/baking/mr/MR-017               │ Pending lavender stabilization proposal │
+└──────────────────────────────────────────────────────────────────────┴─────────────────────────────────────────┘
 ```
 
 #### 3.1 Branch Switch Detection
