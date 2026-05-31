@@ -12,6 +12,7 @@ from typing import Any
 
 from pyoxigraph import BlankNode, Literal, NamedNode, Quad, RdfFormat, Store
 
+from km.exceptions import KmError, is_parser_syntax_error, store_open_error
 from km.infrastructure.config.models import LOPackageConfig, SyncManifest
 from km.infrastructure.rdf.serialization import serialize_graph_block
 from km.logging_config import get_logger
@@ -127,39 +128,57 @@ class QuadStoreWrapper:
     def __init__(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         self.path = path
-        self.store = Store(str(path))
+        try:
+            self.store = Store(str(path))
+        except OSError as exc:
+            raise store_open_error(path, exc) from exc
 
     def clear(self) -> None:
         self.store.clear()
 
     def load_turtle_into_graph(self, turtle_path: Path, graph_uri: str) -> None:
         content = turtle_path.read_bytes()
-        self._load_rdf_bytes(content, graph_uri)
+        self._load_rdf_bytes(content, graph_uri, source=str(turtle_path))
 
     def load_turtle_bytes_into_graph(self, content: bytes, graph_uri: str) -> None:
         self._load_rdf_bytes(content, graph_uri)
 
-    def _load_rdf_bytes(self, content: bytes, graph_uri: str) -> None:
-        text = content.decode("utf-8", errors="replace")
-        if GRAPH_URI_PATTERN.search(text):
-            self.store.load(
-                input=content,
-                format=RdfFormat.TRIG,
-                lenient=True,
-            )
-        elif graph_uri:
-            self.store.load(
-                input=content,
-                format=TURTLE,
-                to_graph=NamedNode(graph_uri),
-                lenient=True,
-            )
-        else:
-            self.store.load(input=content, format=TURTLE, lenient=True)
+    def _load_rdf_bytes(self, content: bytes, graph_uri: str, *, source: str | None = None) -> None:
+        label = source or f"graph <{graph_uri}>"
+        try:
+            text = content.decode("utf-8", errors="replace")
+            if GRAPH_URI_PATTERN.search(text):
+                self.store.load(
+                    input=content,
+                    format=RdfFormat.TRIG,
+                    lenient=True,
+                )
+            elif graph_uri:
+                self.store.load(
+                    input=content,
+                    format=TURTLE,
+                    to_graph=NamedNode(graph_uri),
+                    lenient=True,
+                )
+            else:
+                self.store.load(input=content, format=TURTLE, lenient=True)
+        except SyntaxError as exc:
+            if is_parser_syntax_error(exc):
+                raise KmError(f"Failed to load RDF from {label}: {exc.msg or exc}") from exc
+            raise
+        except OSError as exc:
+            raise KmError(f"Failed to load RDF from {label}: {exc}") from exc
 
     def query(self, sparql: str) -> list[dict[str, str | None]]:
+        try:
+            solution = self.store.query(sparql)
+        except SyntaxError as exc:
+            if is_parser_syntax_error(exc):
+                raise KmError(f"Invalid SPARQL query: {exc.msg or exc}") from exc
+            raise
+        except OSError as exc:
+            raise KmError(f"SPARQL query failed: {exc}") from exc
         results: list[dict[str, str | None]] = []
-        solution = self.store.query(sparql)
         if isinstance(solution, bool):
             return results
         variables = [

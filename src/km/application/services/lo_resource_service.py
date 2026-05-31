@@ -31,10 +31,7 @@ class LOResourceService:
             wrapper.close()
 
     def governance_turtle(self, ontology_id: str) -> str:
-        try:
-            entry = self.lo_source_store.get_entry(ontology_id)
-        except LookupError as exc:
-            raise KmError(str(exc)) from exc
+        entry = self.lo_source_store.get_entry(ontology_id)
         content = entry.wrapper.serialize_graph(entry.lo_config.named_graphs.governance)
         logger.debug("Serialized governance graph for %s from source store", ontology_id)
         return content

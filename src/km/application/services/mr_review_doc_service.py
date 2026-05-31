@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 
+from km.exceptions import KmError
 from km.infrastructure.rdf.diff_renderer import render_semantic_diff
 from km.logging_config import get_logger
 
@@ -65,5 +66,5 @@ class MRReviewDocService:
     def read_review_doc(self, ontology_id: str, mr_id: str) -> str:
         path = self.review_doc_path(ontology_id, mr_id)
         if not path.is_file():
-            raise FileNotFoundError(f"MR review document not found: {path}")
+            raise KmError(f"MR review document not found: {path}")
         return path.read_text(encoding="utf-8")

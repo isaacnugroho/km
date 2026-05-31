@@ -7,7 +7,7 @@ from typing import Any
 
 from km.application.bootstrap import KMApplication
 from km.application.services.feature_gate import require_implemented
-from km.exceptions import FeatureNotImplementedError, KmError
+from km.exceptions import FeatureNotImplementedError, KmError, as_km_error
 from km.logging_config import get_logger
 
 logger = get_logger("mcp.tools")
@@ -76,13 +76,14 @@ def handle_approve_semantic_mr(app: KMApplication, doc_identifier: str) -> dict[
 
 
 def tool_error_payload(exc: Exception) -> str:
-    if isinstance(exc, FeatureNotImplementedError):
-        logger.info("stub: %s", exc)
-    elif isinstance(exc, KmError):
-        logger.error("KM error: %s", exc)
+    km_exc = as_km_error(exc) or exc
+    if isinstance(km_exc, FeatureNotImplementedError):
+        logger.info("stub: %s", km_exc)
+    elif isinstance(km_exc, KmError):
+        logger.error("KM error: %s", km_exc)
     else:
         logger.exception("Unexpected tool error")
-    return str(exc)
+    return str(km_exc)
 
 
 def json_result(data: dict[str, Any]) -> str:

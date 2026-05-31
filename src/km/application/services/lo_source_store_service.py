@@ -6,6 +6,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from km.exceptions import KmError
 from km.infrastructure.config.models import LOBinding, LOPackageConfig
 from km.infrastructure.rdf.store import (
     QuadStoreWrapper,
@@ -108,7 +109,7 @@ class LOSourceStoreService:
         for entry in self.entries:
             if entry.binding.ontology_id == ontology_id:
                 return entry
-        raise LookupError(f"Unknown learning ontology: {ontology_id}")
+        raise KmError(f"Unknown learning ontology: {ontology_id}")
 
     def close(self) -> None:
         for entry in self.entries:

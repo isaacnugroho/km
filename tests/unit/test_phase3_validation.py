@@ -22,6 +22,14 @@ case:api a hex:DrivingAdapter .
 """
 
 DRIVING_ADAPTER_SHAPE = f"{HEX}DrivingAdapterInvocationShape"
+PORT_OWNERSHIP_SHAPE = f"{HEX}PortOwnershipShape"
+
+ORPHAN_PORT_TURTLE = f"""\
+@prefix hex: <{HEX}> .
+@prefix case: <{CASE}> .
+
+case:orphanPort a hex:Port .
+"""
 
 
 def test_conforming_case_passes_validation(tmp_workspace: Path) -> None:
@@ -45,6 +53,21 @@ def test_violating_case_fails_validation(tmp_workspace: Path) -> None:
         assert violation["focus_node"] == f"{CASE}api"
         assert DRIVING_ADAPTER_SHAPE in violation["source_shape"]
         assert violation["message"]
+    finally:
+        app.shutdown()
+
+
+def test_sparql_constraint_resolves_lo_prefix(tmp_workspace: Path) -> None:
+    app = KMApplication.bootstrap(tmp_workspace)
+    try:
+        mcp_tools.handle_ingest_case_facts(app, ORPHAN_PORT_TURTLE, "turtle")
+        result = mcp_tools.handle_validate_constraints(app)
+        assert result["conforms"] is False
+        assert len(result["violations"]) >= 1
+        violation = result["violations"][0]
+        assert violation["focus_node"] == f"{CASE}orphanPort"
+        assert PORT_OWNERSHIP_SHAPE in violation["source_shape"]
+        assert "defined by an Application Core" in violation["message"]
     finally:
         app.shutdown()
 

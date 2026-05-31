@@ -57,7 +57,11 @@ class ValidationService:
             return {"conforms": cached.conforms, "violations": list(cached.violations)}
 
         start = time.perf_counter()
-        data_graph = _case_graph_to_rdflib(self.case_wrapper, graph_uri)
+        data_graph = _case_graph_to_rdflib(
+            self.case_wrapper,
+            graph_uri,
+            self.shacl_cache.prefix_bindings,
+        )
         conforms, report_graph, _ = validate(
             data_graph,
             shacl_graph=self.shacl_cache.shapes_graph,
@@ -87,11 +91,18 @@ class ValidationService:
         return {"conforms": conforms_now, "violations": filtered}
 
 
-def _case_graph_to_rdflib(wrapper: QuadStoreWrapper, graph_uri: str) -> Graph:
+def _case_graph_to_rdflib(
+    wrapper: QuadStoreWrapper,
+    graph_uri: str,
+    prefix_bindings: dict[str, str] | None = None,
+) -> Graph:
     from km.application.services.query_service import _oxi_to_rdflib
     from rdflib import URIRef
 
     graph = Graph()
+    if prefix_bindings:
+        for prefix, namespace_uri in prefix_bindings.items():
+            graph.bind(prefix, namespace_uri)
     for quad in wrapper.quads_in_graph(graph_uri):
         graph.add(
             (

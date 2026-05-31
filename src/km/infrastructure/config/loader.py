@@ -5,25 +5,38 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from km.exceptions import ConfigError
 from km.infrastructure.config.models import LOBinding, LOPackageConfig, WorkspaceConfig
 from km.infrastructure.paths import resolve_path
+
+
+def _load_json_config(config_path: Path, model: type[WorkspaceConfig] | type[LOPackageConfig]):
+    try:
+        data = json.loads(config_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ConfigError(
+            f"Invalid JSON in {config_path}: {exc.msg} at line {exc.lineno}, column {exc.colno}"
+        ) from exc
+    try:
+        return model.model_validate(data)
+    except ValidationError as exc:
+        raise ConfigError(f"Invalid config in {config_path}: {exc}") from exc
 
 
 def load_workspace_config(workspace_root: Path) -> WorkspaceConfig:
     config_path = workspace_root / ".km" / "config.json"
     if not config_path.is_file():
         raise ConfigError(f"Missing workspace config: {config_path}")
-    data = json.loads(config_path.read_text(encoding="utf-8"))
-    return WorkspaceConfig.model_validate(data)
+    return _load_json_config(config_path, WorkspaceConfig)
 
 
 def load_lo_package_config(source_path: Path) -> LOPackageConfig:
     config_path = source_path / "config.json"
     if not config_path.is_file():
         raise ConfigError(f"Missing LO package config: {config_path}")
-    data = json.loads(config_path.read_text(encoding="utf-8"))
-    return LOPackageConfig.model_validate(data)
+    return _load_json_config(config_path, LOPackageConfig)
 
 
 def validate_lo_binding(binding: LOBinding, workspace_root: Path) -> tuple[Path, LOPackageConfig]:

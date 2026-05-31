@@ -10,7 +10,7 @@ from pathlib import Path
 from km.application.bootstrap import KMApplication
 from km.application.services.feature_gate import require_implemented
 from km.application.services.workspace_service import init_workspace
-from km.exceptions import FeatureNotImplementedError, KmError, WorkspaceNotFoundError
+from km.exceptions import FeatureNotImplementedError, KmError, as_km_error
 from km.logging_config import configure_logging, get_logger
 
 logger = get_logger("cli")
@@ -75,9 +75,12 @@ def run_cli(argv: list[str] | None = None) -> int:
     except FeatureNotImplementedError as exc:
         print(str(exc), file=sys.stderr)
         return 2
-    except (KmError, WorkspaceNotFoundError) as exc:
-        print(str(exc), file=sys.stderr)
-        return 1
+    except Exception as exc:
+        km_exc = as_km_error(exc)
+        if km_exc is not None:
+            print(str(km_exc), file=sys.stderr)
+            return 1
+        raise
     except KeyboardInterrupt:
         return 130
     return 0
