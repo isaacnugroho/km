@@ -1,0 +1,140 @@
+GRAPH <http://km.local/graphs/main> {
+    <http://app.local/km#CaseExportPort> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#DrivingPort> .
+    <http://app.local/km#CaseExportPort> <http://www.w3.org/2000/01/rdf-schema#label> "Case Export Port"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#CaseExportPort> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://app.local/km#CaseExportService> .
+    <http://app.local/km#CaseExportService> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#ArchitectureConcept> .
+    <http://app.local/km#CaseExportService> <http://www.w3.org/2000/01/rdf-schema#label> "CaseExportService"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#CaseExportService> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <file://src/km/application/services/case_export_service.py> .
+    <http://app.local/km#CaseIngestPort> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#DrivingPort> .
+    <http://app.local/km#CaseIngestPort> <http://www.w3.org/2000/01/rdf-schema#label> "Case Ingest Port"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#CaseIngestPort> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://app.local/km#CaseIngestService> .
+    <http://app.local/km#CaseIngestService> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#ArchitectureConcept> .
+    <http://app.local/km#CaseIngestService> <http://www.w3.org/2000/01/rdf-schema#label> "CaseIngestService"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#CaseIngestService> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <file://src/km/application/services/case_ingest_service.py> .
+    <http://app.local/km#CliAdapter> <http://architecture.org/hexagonal#invokes> <http://app.local/km#CaseExportPort> .
+    <http://app.local/km#CliAdapter> <http://architecture.org/hexagonal#invokes> <http://app.local/km#MergeResolverPort> .
+    <http://app.local/km#CliAdapter> <http://architecture.org/hexagonal#invokes> <http://app.local/km#StatusPort> .
+    <http://app.local/km#CliAdapter> <http://architecture.org/hexagonal#invokes> <http://app.local/km#WorkspaceInitPort> .
+    <http://app.local/km#CliAdapter> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#DrivingAdapter> .
+    <http://app.local/km#CliAdapter> <http://www.w3.org/2000/01/rdf-schema#label> "CLI Adapter"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#CliAdapter> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <file://src/km/adapters/cli/main.py> .
+    <http://app.local/km#ConfigLoaderAdapter> <http://architecture.org/hexagonal#implements> <http://app.local/km#ConfigPort> .
+    <http://app.local/km#ConfigLoaderAdapter> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#DrivenAdapter> .
+    <http://app.local/km#ConfigLoaderAdapter> <http://www.w3.org/2000/01/rdf-schema#label> "Workspace Config Loader"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#ConfigLoaderAdapter> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <file://src/km/infrastructure/config/loader.py> .
+    <http://app.local/km#ConfigPort> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#DrivenPort> .
+    <http://app.local/km#ConfigPort> <http://www.w3.org/2000/01/rdf-schema#label> "Workspace Configuration Port"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#ExceptionPort> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#DrivingPort> .
+    <http://app.local/km#ExceptionPort> <http://www.w3.org/2000/01/rdf-schema#label> "Local Exception Port"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#ExceptionPort> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://app.local/km#ExceptionService> .
+    <http://app.local/km#ExceptionService> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#ArchitectureConcept> .
+    <http://app.local/km#ExceptionService> <http://www.w3.org/2000/01/rdf-schema#label> "ExceptionService"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#ExceptionService> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <file://src/km/application/services/exception_service.py> .
+    <http://app.local/km#GitContextPort> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#DrivenPort> .
+    <http://app.local/km#GitContextPort> <http://www.w3.org/2000/01/rdf-schema#label> "Git Branch Context Port"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#GitInfraAdapter> <http://architecture.org/hexagonal#implements> <http://app.local/km#GitContextPort> .
+    <http://app.local/km#GitInfraAdapter> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#DrivenAdapter> .
+    <http://app.local/km#GitInfraAdapter> <http://www.w3.org/2000/01/rdf-schema#label> "Git Context Infrastructure"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#GitInfraAdapter> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <file://src/km/infrastructure/git/context.py> .
+    <http://app.local/km#KMApplicationBootstrap> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#ArchitectureConcept> .
+    <http://app.local/km#KMApplicationBootstrap> <http://www.w3.org/2000/01/rdf-schema#label> "KMApplication bootstrap"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#KMApplicationBootstrap> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <file://src/km/application/bootstrap.py> .
+    <http://app.local/km#KMCore> <http://architecture.org/hexagonal#defines> <http://app.local/km#CaseExportPort> .
+    <http://app.local/km#KMCore> <http://architecture.org/hexagonal#defines> <http://app.local/km#CaseIngestPort> .
+    <http://app.local/km#KMCore> <http://architecture.org/hexagonal#defines> <http://app.local/km#ConfigPort> .
+    <http://app.local/km#KMCore> <http://architecture.org/hexagonal#defines> <http://app.local/km#ExceptionPort> .
+    <http://app.local/km#KMCore> <http://architecture.org/hexagonal#defines> <http://app.local/km#GitContextPort> .
+    <http://app.local/km#KMCore> <http://architecture.org/hexagonal#defines> <http://app.local/km#LOCachePort> .
+    <http://app.local/km#KMCore> <http://architecture.org/hexagonal#defines> <http://app.local/km#MergeRequestPort> .
+    <http://app.local/km#KMCore> <http://architecture.org/hexagonal#defines> <http://app.local/km#MergeResolverPort> .
+    <http://app.local/km#KMCore> <http://architecture.org/hexagonal#defines> <http://app.local/km#QuadStorePort> .
+    <http://app.local/km#KMCore> <http://architecture.org/hexagonal#defines> <http://app.local/km#QueryPort> .
+    <http://app.local/km#KMCore> <http://architecture.org/hexagonal#defines> <http://app.local/km#ShaclCachePort> .
+    <http://app.local/km#KMCore> <http://architecture.org/hexagonal#defines> <http://app.local/km#StatusPort> .
+    <http://app.local/km#KMCore> <http://architecture.org/hexagonal#defines> <http://app.local/km#ValidationPort> .
+    <http://app.local/km#KMCore> <http://architecture.org/hexagonal#defines> <http://app.local/km#WorkspaceInitPort> .
+    <http://app.local/km#KMCore> <http://architecture.org/hexagonal#realizes> <http://app.local/km#CaseExportPort> .
+    <http://app.local/km#KMCore> <http://architecture.org/hexagonal#realizes> <http://app.local/km#CaseIngestPort> .
+    <http://app.local/km#KMCore> <http://architecture.org/hexagonal#realizes> <http://app.local/km#ExceptionPort> .
+    <http://app.local/km#KMCore> <http://architecture.org/hexagonal#realizes> <http://app.local/km#MergeRequestPort> .
+    <http://app.local/km#KMCore> <http://architecture.org/hexagonal#realizes> <http://app.local/km#MergeResolverPort> .
+    <http://app.local/km#KMCore> <http://architecture.org/hexagonal#realizes> <http://app.local/km#QueryPort> .
+    <http://app.local/km#KMCore> <http://architecture.org/hexagonal#realizes> <http://app.local/km#StatusPort> .
+    <http://app.local/km#KMCore> <http://architecture.org/hexagonal#realizes> <http://app.local/km#ValidationPort> .
+    <http://app.local/km#KMCore> <http://architecture.org/hexagonal#realizes> <http://app.local/km#WorkspaceInitPort> .
+    <http://app.local/km#KMCore> <http://architecture.org/hexagonal#uses> <http://app.local/km#ConfigPort> .
+    <http://app.local/km#KMCore> <http://architecture.org/hexagonal#uses> <http://app.local/km#GitContextPort> .
+    <http://app.local/km#KMCore> <http://architecture.org/hexagonal#uses> <http://app.local/km#LOCachePort> .
+    <http://app.local/km#KMCore> <http://architecture.org/hexagonal#uses> <http://app.local/km#QuadStorePort> .
+    <http://app.local/km#KMCore> <http://architecture.org/hexagonal#uses> <http://app.local/km#ShaclCachePort> .
+    <http://app.local/km#KMCore> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#ApplicationCore> .
+    <http://app.local/km#KMCore> <http://www.w3.org/2000/01/rdf-schema#comment> "Pure business logic in km/application and km/domain; wired by KMApplication bootstrap."^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#KMCore> <http://www.w3.org/2000/01/rdf-schema#label> "KM Application Core"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#LOCacheInfraAdapter> <http://architecture.org/hexagonal#implements> <http://app.local/km#LOCachePort> .
+    <http://app.local/km#LOCacheInfraAdapter> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#DrivenAdapter> .
+    <http://app.local/km#LOCacheInfraAdapter> <http://www.w3.org/2000/01/rdf-schema#label> "LO Cache Infrastructure"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#LOCacheInfraAdapter> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <file://src/km/application/services/lo_cache_service.py> .
+    <http://app.local/km#LOCachePort> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#DrivenPort> .
+    <http://app.local/km#LOCachePort> <http://www.w3.org/2000/01/rdf-schema#label> "Learning Ontology Cache Port"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#McpAdapter> <http://architecture.org/hexagonal#invokes> <http://app.local/km#CaseIngestPort> .
+    <http://app.local/km#McpAdapter> <http://architecture.org/hexagonal#invokes> <http://app.local/km#ExceptionPort> .
+    <http://app.local/km#McpAdapter> <http://architecture.org/hexagonal#invokes> <http://app.local/km#MergeRequestPort> .
+    <http://app.local/km#McpAdapter> <http://architecture.org/hexagonal#invokes> <http://app.local/km#QueryPort> .
+    <http://app.local/km#McpAdapter> <http://architecture.org/hexagonal#invokes> <http://app.local/km#StatusPort> .
+    <http://app.local/km#McpAdapter> <http://architecture.org/hexagonal#invokes> <http://app.local/km#ValidationPort> .
+    <http://app.local/km#McpAdapter> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#DrivingAdapter> .
+    <http://app.local/km#McpAdapter> <http://www.w3.org/2000/01/rdf-schema#label> "MCP Server Adapter"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#McpAdapter> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <file://src/km/adapters/mcp/server.py> .
+    <http://app.local/km#MergeRequestPort> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#DrivingPort> .
+    <http://app.local/km#MergeRequestPort> <http://www.w3.org/2000/01/rdf-schema#label> "Semantic Merge Request Port"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#MergeRequestPort> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://app.local/km#MergeRequestService> .
+    <http://app.local/km#MergeRequestService> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#ArchitectureConcept> .
+    <http://app.local/km#MergeRequestService> <http://www.w3.org/2000/01/rdf-schema#label> "MergeRequestService"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#MergeRequestService> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <file://src/km/application/services/merge_request_service.py> .
+    <http://app.local/km#MergeResolverPort> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#DrivingPort> .
+    <http://app.local/km#MergeResolverPort> <http://www.w3.org/2000/01/rdf-schema#label> "Branch Merge Resolver Port"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#MergeResolverPort> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://app.local/km#MergeResolverService> .
+    <http://app.local/km#MergeResolverService> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#ArchitectureConcept> .
+    <http://app.local/km#MergeResolverService> <http://www.w3.org/2000/01/rdf-schema#label> "MergeResolverService"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#MergeResolverService> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <file://src/km/application/services/merge_resolver_service.py> .
+    <http://app.local/km#OxigraphQuadStore> <http://architecture.org/hexagonal#implements> <http://app.local/km#QuadStorePort> .
+    <http://app.local/km#OxigraphQuadStore> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#DrivenAdapter> .
+    <http://app.local/km#OxigraphQuadStore> <http://www.w3.org/2000/01/rdf-schema#label> "PyOxigraph Quad Store"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#OxigraphQuadStore> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <file://src/km/infrastructure/rdf/store.py> .
+    <http://app.local/km#PreCommitHookAdapter> <http://architecture.org/hexagonal#invokes> <http://app.local/km#CaseExportPort> .
+    <http://app.local/km#PreCommitHookAdapter> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#DrivingAdapter> .
+    <http://app.local/km#PreCommitHookAdapter> <http://www.w3.org/2000/01/rdf-schema#label> "Pre-commit Hook Adapter"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#PreCommitHookAdapter> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <file://src/km/adapters/hooks/pre-commit.km.sh> .
+    <http://app.local/km#QuadStorePort> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#DrivenPort> .
+    <http://app.local/km#QuadStorePort> <http://www.w3.org/2000/01/rdf-schema#label> "RDF Quad Store Port"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#QueryPort> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#DrivingPort> .
+    <http://app.local/km#QueryPort> <http://www.w3.org/2000/01/rdf-schema#label> "Semantic Query Port"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#QueryPort> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://app.local/km#QueryService> .
+    <http://app.local/km#QueryService> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#ArchitectureConcept> .
+    <http://app.local/km#QueryService> <http://www.w3.org/2000/01/rdf-schema#label> "QueryService"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#QueryService> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <file://src/km/application/services/query_service.py> .
+    <http://app.local/km#ShaclCacheAdapter> <http://architecture.org/hexagonal#implements> <http://app.local/km#ShaclCachePort> .
+    <http://app.local/km#ShaclCacheAdapter> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#DrivenAdapter> .
+    <http://app.local/km#ShaclCacheAdapter> <http://www.w3.org/2000/01/rdf-schema#label> "SHACL Cache Infrastructure"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#ShaclCacheAdapter> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <file://src/km/infrastructure/rdf/shacl_cache.py> .
+    <http://app.local/km#ShaclCachePort> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#DrivenPort> .
+    <http://app.local/km#ShaclCachePort> <http://www.w3.org/2000/01/rdf-schema#label> "SHACL Shapes Cache Port"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#StatusPort> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#DrivingPort> .
+    <http://app.local/km#StatusPort> <http://www.w3.org/2000/01/rdf-schema#label> "System Status Port"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#StatusPort> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://app.local/km#StatusService> .
+    <http://app.local/km#StatusService> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#ArchitectureConcept> .
+    <http://app.local/km#StatusService> <http://www.w3.org/2000/01/rdf-schema#label> "StatusService"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#StatusService> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <file://src/km/application/services/status_service.py> .
+    <http://app.local/km#ValidationPort> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#DrivingPort> .
+    <http://app.local/km#ValidationPort> <http://www.w3.org/2000/01/rdf-schema#label> "Constraint Validation Port"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#ValidationPort> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://app.local/km#ValidationService> .
+    <http://app.local/km#ValidationService> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#ArchitectureConcept> .
+    <http://app.local/km#ValidationService> <http://www.w3.org/2000/01/rdf-schema#label> "ValidationService"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#ValidationService> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <file://src/km/application/services/validation_service.py> .
+    <http://app.local/km#WorkspaceInitPort> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#DrivingPort> .
+    <http://app.local/km#WorkspaceInitPort> <http://www.w3.org/2000/01/rdf-schema#label> "Workspace Initialization Port"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#WorkspaceInitPort> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://app.local/km#WorkspaceService> .
+    <http://app.local/km#WorkspaceService> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#ArchitectureConcept> .
+    <http://app.local/km#WorkspaceService> <http://www.w3.org/2000/01/rdf-schema#label> "WorkspaceService"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#WorkspaceService> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <file://src/km/application/services/workspace_service.py> .
+}
