@@ -86,10 +86,6 @@ def run_cli(argv: list[str] | None = None) -> int:
     return 0
 
 
-if __name__ == "__main__":
-    main()
-
-
 def cmd_init(path: Path, *, lo_source: str | None, with_hooks: bool = False) -> None:
     config_path = init_workspace(path, lo_source=lo_source)
     print(f"Initialized workspace config at {config_path}")
@@ -146,3 +142,7 @@ def cmd_merge_resolve(event_id: str, resolution: str) -> None:
         print(json.dumps(result, indent=2))
     finally:
         app.shutdown()
+
+
+if __name__ == "__main__":
+    main()

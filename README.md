@@ -112,6 +112,32 @@ Add to your Cursor MCP settings (`.cursor/mcp.json` or Cursor Settings → MCP):
 
 Use the absolute path to your workspace as `cwd` so `.km/config.json` is found.
 
+### Standalone binary (PyInstaller)
+
+If `km` is not on the IDE's `PATH` (common on Linux when the binary lives in `~/.local/bin` or `dist/`), use the **absolute path** to the executable:
+
+```json
+{
+  "mcpServers": {
+    "km": {
+      "command": "/absolute/path/to/km",
+      "args": ["mcp"],
+      "cwd": "/path/to/your/workspace"
+    }
+  }
+}
+```
+
+Example after `./scripts/build-linux.sh`:
+
+```json
+"command": "/werkz/personal/km/dist/km"
+```
+
+`spawn km ENOENT` means the MCP client could not resolve `command` — fix by using a full path or installing `km` somewhere the GUI inherits on `PATH` (e.g. `/usr/local/bin`).
+
+VS Code uses the same shape under `.vscode/mcp.json`, but the root key is `"servers"` instead of `"mcpServers"`.
+
 ## Bundled learning ontology
 
 The repo includes a sample LO at [usages/ontologies/hexagonal-architecture/](usages/ontologies/hexagonal-architecture/). `km init` binds it by default.
