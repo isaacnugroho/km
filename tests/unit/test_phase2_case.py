@@ -74,7 +74,7 @@ def test_ingest_on_write_exports(tmp_workspace_on_write: Path) -> None:
         export_file = tmp_workspace_on_write / "case-exports" / "graphs" / "refs-heads-main.ttl"
         assert export_file.is_file()
         assert "http://km.local/cases/my_core" in export_file.read_text()
-        assert (tmp_workspace_on_write / "case-exports" / "sync-manifest.json").is_file()
+        assert (tmp_workspace_on_write / ".km" / "main_sync-manifest.json").is_file()
     finally:
         app.shutdown()
 

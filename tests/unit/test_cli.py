@@ -39,7 +39,7 @@ def test_cmd_export_case_writes_graph_file(
     export_path = tmp_workspace / "case-exports" / "graphs" / "refs-heads-main.ttl"
     assert export_path.is_file()
     assert "my_core" in export_path.read_text(encoding="utf-8")
-    manifest = tmp_workspace / "case-exports" / "sync-manifest.json"
+    manifest = tmp_workspace / ".km" / "main_sync-manifest.json"
     assert manifest.is_file()
 
 

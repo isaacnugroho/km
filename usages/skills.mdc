@@ -64,3 +64,13 @@ Approved exceptions are branch-scoped; `auto_merge_exception` policy copies them
    `approve .km/mrs/mr-{ontology}-{id}.md`
 4. **`approve_semantic_mr`** with `doc_identifier` when developer approves.
 5. On `APPROVED`: **`get_system_status`** — confirm `.km/lo-cache/` rebuilt and canonical cache reloaded.
+
+## Skill 5: Branch Case Merge Resolution
+
+**When:** A feature branch was merged into `main`/`master` in Git and Case facts need §5.3 sync.
+
+1. **`get_system_status`** — check `pending_branch_merges_count` and `branch_merge_policy`.
+2. **`propose_branch_merge`** (`source_branch`, optional `target_branch`) — not `km merge-resolve` while MCP runs.
+3. If `status` is `PENDING_RESOLUTION`, present `approval_command` to the developer and pause.
+4. **`resolve_branch_merge`** (`event_id`, `resolution`) when the developer approves.
+5. Confirm `pending_branch_merges_count` is 0.

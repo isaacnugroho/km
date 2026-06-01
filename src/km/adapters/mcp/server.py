@@ -112,6 +112,38 @@ def approve_semantic_mr(doc_identifier: str) -> str:
     return tool_handlers.json_result(result)
 
 
+@mcp.tool()
+def propose_branch_merge(
+    source_branch: str,
+    target_branch: str | None = None,
+    event_fingerprint: str | None = None,
+) -> str:
+    """Propose Case Ontology sync after merging a feature branch into main/master.
+
+    Use while km mcp is running instead of km merge-resolve (avoids case_quads.db lock).
+    Returns event_id, options, and approval_command when human resolution is required.
+    """
+    result = _run_tool(
+        lambda: tool_handlers.handle_propose_branch_merge(
+            _get_app(), source_branch, target_branch, event_fingerprint
+        )
+    )
+    return tool_handlers.json_result(result)
+
+
+@mcp.tool()
+def resolve_branch_merge(event_id: str, resolution: str) -> str:
+    """Resolve a pending branch merge (MERGE, KEEP_ISOLATED, or DELETE).
+
+    Invoke after the developer approves the command from propose_branch_merge.
+    Do not run km merge-resolve while km mcp is active.
+    """
+    result = _run_tool(
+        lambda: tool_handlers.handle_resolve_branch_merge(_get_app(), event_id, resolution)
+    )
+    return tool_handlers.json_result(result)
+
+
 @mcp.resource("km://schemas/learning-ontologies")
 def schemas_learning_ontologies() -> str:
     content, _ = resource_handlers.read_resource(_get_app(), "km://schemas/learning-ontologies")
@@ -133,6 +165,19 @@ def case_active_exceptions() -> str:
 @mcp.resource("km://case/active-exceptions/{exception_id}")
 def case_active_exception_item(exception_id: str) -> str:
     uri = f"km://case/active-exceptions/{exception_id}"
+    content, _ = resource_handlers.read_resource(_get_app(), uri)
+    return content
+
+
+@mcp.resource("km://case/pending-merges")
+def case_pending_merges() -> str:
+    content, _ = resource_handlers.read_resource(_get_app(), "km://case/pending-merges")
+    return content
+
+
+@mcp.resource("km://case/pending-merges/{event_id}")
+def case_pending_merge_item(event_id: str) -> str:
+    uri = f"km://case/pending-merges/{event_id}"
     content, _ = resource_handlers.read_resource(_get_app(), uri)
     return content
 

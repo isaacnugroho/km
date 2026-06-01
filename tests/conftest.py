@@ -12,7 +12,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HEXAGONAL_LO = REPO_ROOT / "usages" / "ontologies" / "hexagonal-architecture"
-LO_RUNTIME_IGNORE = shutil.ignore_patterns("lo_quads.db", ".km-source-sync-manifest.json")
+LO_RUNTIME_IGNORE = shutil.ignore_patterns("lo_quads.db")
 _GIT_ENV = {
     **os.environ,
     "GIT_AUTHOR_NAME": "km-test",

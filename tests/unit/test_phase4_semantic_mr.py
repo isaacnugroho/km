@@ -39,7 +39,7 @@ def test_propose_creates_governance_export_and_review_doc(tmp_curator_workspace:
     app = KMApplication.bootstrap(tmp_curator_workspace)
     try:
         cache_manifest_before = load_sync_manifest(
-            tmp_curator_workspace / ".km" / "lo-cache" / "hexagonal-architecture" / "sync-manifest.json"
+            tmp_curator_workspace / ".km" / "hexagonal-architecture_sync-manifest.json"
         )
         assert cache_manifest_before is not None
         checksums_before = cache_manifest_before.export_checksums
@@ -72,7 +72,7 @@ def test_propose_creates_governance_export_and_review_doc(tmp_curator_workspace:
         assert "+hex:TestPromotionClass" in review_text
 
         cache_manifest_after = load_sync_manifest(
-            tmp_curator_workspace / ".km" / "lo-cache" / "hexagonal-architecture" / "sync-manifest.json"
+            tmp_curator_workspace / ".km" / "hexagonal-architecture_sync-manifest.json"
         )
         assert cache_manifest_after is not None
         assert cache_manifest_after.export_checksums == checksums_before
@@ -135,7 +135,7 @@ def test_approve_merges_into_canonical_and_refreshes_cache(tmp_curator_workspace
         rel_doc = f".km/mrs/mr-hexagonal-architecture-{mr_id.removeprefix('MR-')}.md"
 
         cache_manifest_before = load_sync_manifest(
-            tmp_curator_workspace / ".km" / "lo-cache" / "hexagonal-architecture" / "sync-manifest.json"
+            tmp_curator_workspace / ".km" / "hexagonal-architecture_sync-manifest.json"
         )
         assert cache_manifest_before is not None
 
@@ -161,7 +161,7 @@ def test_approve_merges_into_canonical_and_refreshes_cache(tmp_curator_workspace
         assert "APPROVED" in gov_export.read_text(encoding="utf-8")
 
         cache_manifest_after = load_sync_manifest(
-            tmp_curator_workspace / ".km" / "lo-cache" / "hexagonal-architecture" / "sync-manifest.json"
+            tmp_curator_workspace / ".km" / "hexagonal-architecture_sync-manifest.json"
         )
         assert cache_manifest_after is not None
         assert cache_manifest_after.export_checksums != cache_manifest_before.export_checksums

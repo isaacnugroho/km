@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from km.infrastructure.config.models import LOBinding, LOPackageConfig, SyncManifest
+from km.infrastructure.sync_manifest import lo_sync_manifest_path, workspace_km_dir
 from km.infrastructure.rdf.store import (
     QuadStoreWrapper,
     compute_export_checksums,
@@ -41,7 +42,7 @@ class LOCacheService:
     def sync_binding(self, binding: LOBinding, lo_config: LOPackageConfig, source_path: Path) -> LOCacheEntry:
         cache_dir = self.lo_cache_base / binding.ontology_id
         cache_db = cache_dir / "lo_quads.db"
-        manifest_path = cache_dir / "sync-manifest.json"
+        manifest_path = lo_sync_manifest_path(workspace_km_dir(self.workspace_root), binding.ontology_id)
 
         current_checksums = compute_export_checksums(source_path)
         rebuild = needs_cache_rebuild(cache_db, manifest_path, current_checksums)

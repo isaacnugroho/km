@@ -442,7 +442,7 @@ Running a comprehensive SHACL validation (`pyshacl`) on large graphs on every in
 
 ## 4. MCP Server Interface: Tools & Resources Specifications
 
-The KM MCP Server exposes a standard interface enabling reading, writing, validation, and human-in-the-loop control via **eight MCP tools** and **six MCP resources**.
+The KM MCP Server exposes a standard interface enabling reading, writing, validation, and human-in-the-loop control via **ten MCP tools** and **eight MCP resources**.
 
 ### 4.1 MCP Tools Specification
 
@@ -455,6 +455,8 @@ Mutating tools write to the runtime quad-store first, then update Git-authoritat
 | `propose_local_exception`      | `.km/case_quads.db`    | Upsert active branch graph file                                                       |
 | `approve_local_exception`      | `.km/case_quads.db`    | Upsert active branch graph file                                                       |
 | Branch merge resolver (daemon) | `.km/case_quads.db`    | Upsert affected graph files; create `case-exports/governance/{event-id}.ttl`          |
+| `propose_branch_merge`         | `.km/case_quads.db`    | May run §5.3 policy steps; writes `.km/pending-merge-{event-id}.json` when prompted   |
+| `resolve_branch_merge`         | `.km/case_quads.db`    | Upsert affected graph files; governance record; remove pending prompt                 |
 | `propose_semantic_mr`          | `{source}/lo_quads.db` | Upsert `{source}/exports/governance/{mr-id}.ttl`                                      |
 | `approve_semantic_mr` / reject | `{source}/lo_quads.db` | Regenerate `{source}/exports/main.ttl`; update MR governance shard                    |
 
@@ -666,9 +668,10 @@ Returns environmental and memory states of the KM daemon.
         },
         "pending_exceptions_count": { "type": "integer" },
         "pending_mrs_count": { "type": "integer", "description": "Count of km:status PENDING_APPROVAL in source governance graphs" },
-        "branch_merge_policy": { "type": "string", "enum": ["no_auto_merge", "auto_merge", "auto_merge_exception"], "description": "Effective branch_merge.policy from config (default auto_merge_exception)" }
+        "branch_merge_policy": { "type": "string", "enum": ["no_auto_merge", "auto_merge", "auto_merge_exception"], "description": "Effective branch_merge.policy from config (default auto_merge_exception)" },
+        "pending_branch_merges_count": { "type": "integer", "description": "Count of pending §5.3 merge prompts in .km/pending-merge-*.json" }
       },
-      "required": ["active_branch", "learning_ontologies", "pending_exceptions_count", "pending_mrs_count", "branch_merge_policy"]
+      "required": ["active_branch", "learning_ontologies", "pending_exceptions_count", "pending_mrs_count", "branch_merge_policy", "pending_branch_merges_count"]
     }
     ```
 
@@ -701,6 +704,40 @@ Records human approval of a pending semantic Merge Request. Requires `mode: "cur
     }
     ```
 
+#### 9. `propose_branch_merge`
+Initiates or surfaces Case Ontology branch merge resolution per §5.3 and `branch_merge.policy`. Use while `km mcp` is running instead of `km merge-resolve` (parallel CLI processes lock `.km/case_quads.db`).
+
+*   **Parameters Schema:**
+    ```json
+    {
+      "type": "object",
+      "properties": {
+        "source_branch": { "type": "string", "description": "Git branch path for the merged feature graph (e.g. feature/my-work)" },
+        "target_branch": { "type": "string", "description": "Target branch (default: main if present, else master)" },
+        "event_fingerprint": { "type": "string", "description": "Optional reflog fingerprint; derived from git or mcp-{hash} when omitted" }
+      },
+      "required": ["source_branch"]
+    }
+    ```
+*   **Response Schema:** `{ "event_id", "status": "PENDING_RESOLUTION" | "AUTO_MERGED" | "NO_ACTION", "policy", "source_branch", "target_branch", "exceptions_copied", "remaining_triples", "options", "warning", "approval_command" }`
+*   **Approval command:** `resolve_branch_merge {event_id} MERGE` (or `KEEP_ISOLATED` / `DELETE`). Resource: `km://case/pending-merges/{event_id}`.
+
+#### 10. `resolve_branch_merge`
+Applies developer resolution for a pending branch merge prompt. Mutates `.km/case_quads.db` in the MCP process only.
+
+*   **Parameters Schema:**
+    ```json
+    {
+      "type": "object",
+      "properties": {
+        "event_id": { "type": "string" },
+        "resolution": { "type": "string", "enum": ["MERGE", "KEEP_ISOLATED", "DELETE"] }
+      },
+      "required": ["event_id", "resolution"]
+    }
+    ```
+*   **Response Schema:** `{ "status": "success", "event_id", "resolution", "triples_imported" }`
+
 ---
 
 ### 4.2 MCP Resources Specification
@@ -721,13 +758,19 @@ Resources allow the client agent to perform bulk reads of schema metadata and ac
 Individual exceptions are addressable as `km://case/active-exceptions/{exception-id}` where `{exception-id}` matches the `@id` / `exception_id` URI returned by `propose_local_exception`. 
 The developer approval command is: `approve km://case/active-exceptions/{exception-id}`.
 
-4.  **`km://learning-ontologies/{ontology-id}/canonical`**
+4.  **`km://case/pending-merges`**
+    *   **Description:** Lists all pending §5.3 branch merge prompts (JSON array).
+    *   **Format:** `application/json`
+    *   **Item URI:** `km://case/pending-merges/{event-id}` — single prompt payload.
+    *   **Approval command:** `resolve_branch_merge {event-id} MERGE` (or `KEEP_ISOLATED` / `DELETE`).
+
+5.  **`km://learning-ontologies/{ontology-id}/canonical`**
     *   **Description:** Returns the serialized canonical graph for a specific Learning Ontology.
     *   **Format:** `text/turtle`
-5.  **`km://learning-ontologies/{ontology-id}/governance`**
+6.  **`km://learning-ontologies/{ontology-id}/governance`**
     *   **Description:** Returns MR governance records for a specific Learning Ontology. Reads from **source** `{source}/lo_quads.db`, not the workspace cache.
     *   **Format:** `text/turtle`
-6.  **`km://mr/{ontology-id}/{mr-id}`**
+7.  **`km://mr/{ontology-id}/{mr-id}`**
 
 **MR resource URI**
 

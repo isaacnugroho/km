@@ -7,6 +7,7 @@ from typing import Any
 
 from km.application.bootstrap import KMApplication
 from km.application.services.feature_gate import require_implemented
+from km.application.services.merge_resolver_service import default_target_branch
 from km.exceptions import FeatureNotImplementedError, KmError, as_km_error
 from km.logging_config import get_logger
 
@@ -73,6 +74,30 @@ def handle_approve_semantic_mr(app: KMApplication, doc_identifier: str) -> dict[
     result = app.merge_requests.approve(doc_identifier)
     app.shacl_cache = app.validation.shacl_cache
     return result
+
+
+def handle_propose_branch_merge(
+    app: KMApplication,
+    source_branch: str,
+    target_branch: str | None = None,
+    event_fingerprint: str | None = None,
+) -> dict[str, Any]:
+    require_implemented("propose_branch_merge")
+    target = target_branch or default_target_branch(app.workspace_root)
+    return app.merge_resolver.propose(
+        source_branch,
+        target,
+        app.workspace.config.branch_merge.policy,
+        app.workspace_root,
+        event_fingerprint=event_fingerprint,
+    )
+
+
+def handle_resolve_branch_merge(
+    app: KMApplication, event_id: str, resolution: str
+) -> dict[str, Any]:
+    require_implemented("resolve_branch_merge")
+    return app.merge_resolver.resolve(event_id, resolution)
 
 
 def tool_error_payload(exc: Exception) -> str:

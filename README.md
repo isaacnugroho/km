@@ -54,7 +54,8 @@ Phase 5 adds Git-aligned case lifecycle:
 - Git ref watcher (MCP daemon) — branch switch detection, context swap, inheritance
 - Branch inheritance — clone-on-write from parent when a new branch graph is empty
 - Merge resolver — `auto_merge`, `auto_merge_exception` (default), `no_auto_merge` policies
-- `km merge-resolve` — resolve pending prompts in `.km/pending-merge-{event-id}.json`
+- `propose_branch_merge` / `resolve_branch_merge` MCP tools — resolve pending merges while `km mcp` is running
+- `km merge-resolve` — headless/CI only when MCP is stopped (parallel CLI locks `case_quads.db`)
 - `km export-case` — export active branch graph + manifest
 - `km init --with-hooks` — install pre-commit hook for `on_commit` export policy
 
@@ -170,15 +171,17 @@ pytest
 | `approve_local_exception` | Implemented                   |
 | `propose_semantic_mr`     | Implemented (curator binding) |
 | `approve_semantic_mr`     | Implemented (curator binding) |
+| `propose_branch_merge`    | Implemented                   |
+| `resolve_branch_merge`    | Implemented                   |
 
-Resources: all six MCP resources are implemented (`km://schemas/learning-ontologies`, `km://case/active-graph`, `km://case/active-exceptions`, `km://learning-ontologies/{id}/canonical`, `km://learning-ontologies/{id}/governance`, `km://mr/{ontology-id}/{mr-id}`).
+Resources: eight MCP resources are implemented (`km://schemas/learning-ontologies`, `km://case/active-graph`, `km://case/active-exceptions`, `km://case/pending-merges`, `km://learning-ontologies/{id}/canonical`, `km://learning-ontologies/{id}/governance`, `km://mr/{ontology-id}/{mr-id}`).
 
 ## CLI commands
 
-| Command                               | Description                                                |
-| :------------------------------------ | :--------------------------------------------------------- |
-| `km init [--path DIR] [--with-hooks]` | Create `.km/config.json` and case-exports dirs             |
-| `km status`                           | Print system status JSON                                   |
-| `km mcp`                              | Start MCP stdio server (enables git watcher)               |
-| `km export-case`                      | Export active branch graph to `case-exports/`              |
-| `km merge-resolve EVENT RESOLUTION`   | Resolve pending merge (`MERGE`, `KEEP_ISOLATED`, `DELETE`) |
+| Command                               | Description                                                                                |
+| :------------------------------------ | :----------------------------------------------------------------------------------------- |
+| `km init [--path DIR] [--with-hooks]` | Create `.km/config.json` and case-exports dirs                                             |
+| `km status`                           | Print system status JSON                                                                   |
+| `km mcp`                              | Start MCP stdio server (enables git watcher)                                               |
+| `km export-case`                      | Export active branch graph to `case-exports/`                                              |
+| `km merge-resolve EVENT RESOLUTION`   | Resolve pending merge when MCP is **not** running (same choices as `resolve_branch_merge`) |

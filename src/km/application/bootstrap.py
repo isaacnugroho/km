@@ -86,19 +86,20 @@ class KMApplication:
         shacl_cache = ShaclCache.compile_from_lo_entries(lo_cache.entries)
 
         lo_source_store = LOSourceStoreService()
-        lo_source_store.bootstrap_all(binding_data)
+        km_dir = root / ".km"
+        lo_source_store.bootstrap_all(binding_data, km_dir=km_dir)
         lo_resources = LOResourceService(lo_cache, lo_source_store)
         lo_export = LOExportService()
         review_docs = MRReviewDocService(root)
 
         case_db = workspace.resolve_config_path(workspace.config.quad_store.storage_path)
         exports_root = workspace.resolve_config_path(workspace.config.case_exports.base_path)
-        case_store = CaseStoreService(root, case_db, exports_root)
+        case_store = CaseStoreService(root, case_db, exports_root, km_dir)
         case_wrapper = case_store.bootstrap()
 
         git = GitContextHolder.create(root)
 
-        case_export = CaseExportService(exports_root, case_wrapper)
+        case_export = CaseExportService(exports_root, case_wrapper, km_dir)
         validation = ValidationService(case_wrapper, shacl_cache)
         merge_requests = MergeRequestService(
             root,
@@ -161,6 +162,7 @@ class KMApplication:
             self.lo_cache.entries,
             self.exceptions,
             self.merge_requests,
+            self.merge_prompts,
         )
 
     def shutdown(self) -> None:

@@ -56,6 +56,17 @@ def read_resource(app: KMApplication, uri: str) -> tuple[str, str]:
         item = app.exceptions.get_exception(exception_id, app.git_context)
         return json.dumps(item, indent=2), "application/json"
 
+    if uri == "km://case/pending-merges":
+        require_implemented("resource:case/pending-merges")
+        items = app.merge_resolver.list_pending()
+        return json.dumps(items, indent=2), "application/json"
+
+    if uri.startswith("km://case/pending-merges/"):
+        require_implemented("resource:case/pending-merges")
+        event_id = uri.removeprefix("km://case/pending-merges/")
+        item = app.merge_resolver.get_pending_prompt(event_id)
+        return json.dumps(item, indent=2), "application/json"
+
     if uri.startswith("km://learning-ontologies/") and uri.endswith("/canonical"):
         require_implemented("resource:lo/canonical")
         ontology_id = _ontology_id_from_uri(uri, "/canonical")

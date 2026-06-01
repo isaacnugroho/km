@@ -33,7 +33,7 @@ You MUST integrate KM MCP tool operations into your standard execution loop at s
 
 ### Phase 1: Context Ingestion & Alignment (On Startup / Task Start)
 Before writing any code or proposing plans, align your context window with the workspace's loaded ontologies:
-1.  **Retrieve System Status:** Invoke `get_system_status` to determine the active Git branch, the effective `branch_merge_policy`, and the loaded Learning Ontology bindings (ontology_id, source, mode, cache sync state).
+1.  **Retrieve System Status:** Invoke `get_system_status` to determine the active Git branch, the effective `branch_merge_policy`, `pending_branch_merges_count`, and the loaded Learning Ontology bindings (ontology_id, source, mode, cache sync state).
 2.  **Inspect Active Schemas:** Read the schema resource at `km://schemas/learning-ontologies` to understand available classes, properties, and constraint boundaries (sourced from cached LO **canonical graphs** only).
 3.  **Read Case Triples:** Load `km://case/active-graph` or execute targeted SPARQL read queries (`query_semantic_graph`) to understand what structural facts have already been established for this branch.
 
@@ -161,3 +161,17 @@ When a local pattern or structural extension proves to be globally useful, promo
     )
     ```
 6.  **Re-align:** On `{ "status": "APPROVED" }`, invoke `get_system_status` to confirm the workspace LO cache is refreshed and the canonical graph cache is synchronized.
+
+---
+
+## 5. Branch Case Merge Resolution (Post-Git Merge)
+
+After merging a feature branch into `main` or `master`, synchronize Case Ontology graphs per `branch_merge.policy` (§5.3):
+
+1.  **`propose_branch_merge`** (`source_branch`, optional `target_branch`) — runs policy steps and returns `approval_command` when human input is required.
+2.  **Do not** run `km merge-resolve` while `km mcp` is active; a second process cannot open `.km/case_quads.db`.
+3.  Prompt the developer with the returned command, e.g. `resolve_branch_merge merge-feature-x-into-main-abc123 MERGE`.
+4.  On approval, invoke **`resolve_branch_merge`** with `event_id` and `MERGE`, `KEEP_ISOLATED`, or `DELETE`.
+5.  Confirm `pending_branch_merges_count` is 0 via `get_system_status`.
+
+Read `km://case/pending-merges` or `km://case/pending-merges/{event_id}` for pending prompt payloads.

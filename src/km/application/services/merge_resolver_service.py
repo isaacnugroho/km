@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from pyoxigraph import Literal, NamedNode, Quad
@@ -27,6 +29,7 @@ from km.domain.governance import (
 )
 from km.exceptions import KmError
 from km.infrastructure.config.models import BranchMergePolicy
+from km.infrastructure.git.merge_base import detect_recent_merge
 from km.infrastructure.rdf.ref_mapping import branch_path_to_graph_uri
 from km.infrastructure.rdf.serialization import serialize_graph_block
 from km.infrastructure.rdf.store import QuadStoreWrapper
@@ -47,6 +50,39 @@ class MergeHandleResult:
     prompt_written: bool
 
 
+def default_target_branch(workspace_root: Path) -> str:
+    heads = workspace_root / ".git" / "refs" / "heads"
+    if (heads / "main").is_file():
+        return "main"
+    if (heads / "master").is_file():
+        return "master"
+    raise KmError("No main or master branch found under .git/refs/heads/")
+
+
+def build_merge_event_id(
+    source_branch: str, target_branch: str, event_fingerprint: str
+) -> str:
+    return (
+        f"merge-{source_branch.replace('/', '-')}-into-"
+        f"{target_branch.replace('/', '-')}-{event_fingerprint}"
+    )
+
+
+def resolve_merge_event_fingerprint(
+    workspace_root: Path,
+    source_branch: str,
+    target_branch: str,
+    event_fingerprint: str | None = None,
+) -> str:
+    if event_fingerprint:
+        return event_fingerprint
+    detected = detect_recent_merge(workspace_root, target_branch)
+    if detected and detected[0] == source_branch:
+        return detected[1]
+    digest = hashlib.sha256(f"{source_branch}:{target_branch}".encode()).hexdigest()[:16]
+    return f"mcp-{digest}"
+
+
 class MergeResolverService:
     def __init__(
         self,
@@ -60,6 +96,111 @@ class MergeResolverService:
         self.prompt_store = prompt_store
         self.processed_events = processed_events if processed_events is not None else set()
 
+    def list_pending(self) -> list[dict[str, Any]]:
+        return self.prompt_store.list_pending()
+
+    def propose(
+        self,
+        source_branch: str,
+        target_branch: str,
+        policy: BranchMergePolicy,
+        workspace_root: Path,
+        *,
+        event_fingerprint: str | None = None,
+    ) -> dict[str, Any]:
+        fingerprint = resolve_merge_event_fingerprint(
+            workspace_root, source_branch, target_branch, event_fingerprint
+        )
+        event_id = build_merge_event_id(source_branch, target_branch, fingerprint)
+
+        if self.prompt_store.prompt_path(event_id).is_file():
+            return self._propose_response_from_prompt(
+                self.prompt_store.read_prompt(event_id)
+            )
+
+        result = self.handle_merge(
+            source_branch,
+            target_branch,
+            policy,
+            event_fingerprint=fingerprint,
+        )
+
+        if self.prompt_store.prompt_path(event_id).is_file():
+            return self._propose_response_from_prompt(
+                self.prompt_store.read_prompt(event_id)
+            )
+
+        if result is None:
+            return self._propose_no_action(
+                event_id,
+                policy.value,
+                source_branch,
+                target_branch,
+            )
+
+        if result.prompt_written:
+            return self._propose_response_from_prompt(
+                self.prompt_store.read_prompt(event_id)
+            )
+
+        status = "AUTO_MERGED" if policy == BranchMergePolicy.AUTO_MERGE else "NO_ACTION"
+        return {
+            "event_id": event_id,
+            "status": status,
+            "policy": result.policy,
+            "source_branch": source_branch,
+            "target_branch": target_branch,
+            "exceptions_copied": result.exceptions_copied,
+            "remaining_triples": 0,
+            "options": [],
+            "warning": None,
+            "approval_command": None,
+            "triples_imported": result.triples_imported,
+        }
+
+    def resolve(self, event_id: str, resolution: str) -> dict[str, Any]:
+        outcome = self.resolve_prompt(event_id, resolution)
+        return {"status": "success", **outcome}
+
+    def get_pending_prompt(self, event_id: str) -> dict[str, Any]:
+        return self.prompt_store.read_prompt(event_id)
+
+    @staticmethod
+    def _propose_response_from_prompt(prompt: dict[str, Any]) -> dict[str, Any]:
+        event_id = prompt["event_id"]
+        return {
+            "event_id": event_id,
+            "status": "PENDING_RESOLUTION",
+            "policy": prompt["policy"],
+            "source_branch": prompt["source_branch"],
+            "target_branch": prompt["target_branch"],
+            "exceptions_copied": int(prompt.get("exceptions_copied", 0)),
+            "remaining_triples": int(prompt.get("remaining_triples", 0)),
+            "options": list(prompt["options"]),
+            "warning": prompt.get("warning"),
+            "approval_command": f"resolve_branch_merge {event_id} MERGE",
+        }
+
+    @staticmethod
+    def _propose_no_action(
+        event_id: str,
+        policy: str,
+        source_branch: str,
+        target_branch: str,
+    ) -> dict[str, Any]:
+        return {
+            "event_id": event_id,
+            "status": "NO_ACTION",
+            "policy": policy,
+            "source_branch": source_branch,
+            "target_branch": target_branch,
+            "exceptions_copied": 0,
+            "remaining_triples": 0,
+            "options": [],
+            "warning": None,
+            "approval_command": None,
+        }
+
     def handle_merge(
         self,
         source_branch: str,
@@ -68,7 +209,7 @@ class MergeResolverService:
         *,
         event_fingerprint: str,
     ) -> MergeHandleResult | None:
-        event_id = f"merge-{source_branch.replace('/', '-')}-into-{target_branch.replace('/', '-')}-{event_fingerprint}"
+        event_id = build_merge_event_id(source_branch, target_branch, event_fingerprint)
         if event_id in self.processed_events:
             return None
 

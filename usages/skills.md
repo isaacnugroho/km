@@ -166,3 +166,18 @@ sequenceDiagram
     )
     ```
 6.  **Reload Memory System:** On `{ "status": "APPROVED" }`, invoke `get_system_status` to confirm the workspace LO cache (`.km/lo-cache/`) is refreshed from source exports and the in-memory canonical cache is reloaded.
+
+---
+
+## Skill 5: Branch Case Merge Resolution
+
+**Purpose:** Synchronize Case Ontology graphs after Git merges a feature branch into `main`/`master` (spec §5.3).
+
+**When:** `pending_branch_merges_count > 0` in `get_system_status`, or immediately after `git merge` on the target branch.
+
+1.  **`propose_branch_merge`** with `source_branch` (and optional `target_branch`). Do **not** shell out to `km merge-resolve` while `km mcp` is running — it locks `.km/case_quads.db`.
+2.  If `status` is `PENDING_RESOLUTION`, show the developer the `approval_command` (e.g. `resolve_branch_merge merge-feature-x-into-main-abc123 MERGE`).
+3.  **Await approval**, then **`resolve_branch_merge`** with the chosen `MERGE`, `KEEP_ISOLATED`, or `DELETE`.
+4.  Re-check **`get_system_status`** — `pending_branch_merges_count` should be 0.
+
+Optional read: `km://case/pending-merges/{event_id}`.

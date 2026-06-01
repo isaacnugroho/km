@@ -2,7 +2,19 @@
 
 from __future__ import annotations
 
+import re
+
 GRAPH_BASE = "http://km.local/graphs"
+
+
+def branch_path_to_slug(branch_path: str) -> str:
+    """Branch path with non-alphanumeric runs replaced by ``-`` (e.g. ``feature/foo`` → ``feature-foo``)."""
+    slug = re.sub(r"[^a-zA-Z0-9]+", "-", branch_path)
+    return slug.strip("-")
+
+
+def ref_to_branch_slug(git_ref: str) -> str:
+    return branch_path_to_slug(ref_to_branch_path(git_ref))
 
 
 def branch_path_to_graph_uri(branch_path: str) -> str:

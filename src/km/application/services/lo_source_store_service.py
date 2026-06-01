@@ -8,6 +8,7 @@ from pathlib import Path
 
 from km.exceptions import KmError
 from km.infrastructure.config.models import LOBinding, LOPackageConfig
+from km.infrastructure.sync_manifest import lo_sync_manifest_path, workspace_km_dir
 from km.infrastructure.rdf.store import (
     QuadStoreWrapper,
     compute_export_checksums,
@@ -19,8 +20,6 @@ from km.infrastructure.rdf.store import (
 from km.logging_config import get_logger
 
 logger = get_logger("lo_source_store")
-
-SOURCE_SYNC_MANIFEST = ".km-source-sync-manifest.json"
 
 
 def resolve_lo_storage_path(source_path: Path, storage_path: str) -> Path:
@@ -50,11 +49,13 @@ class LOSourceStoreService:
     def bootstrap_all(
         self,
         bindings: list[tuple[LOBinding, LOPackageConfig, Path]],
+        *,
+        km_dir: Path,
     ) -> list[LOSourceStoreEntry]:
         self.close()
         self.entries.clear()
         for binding, lo_config, source_path in bindings:
-            self.entries.append(self._bootstrap_binding(binding, lo_config, source_path))
+            self.entries.append(self._bootstrap_binding(binding, lo_config, source_path, km_dir))
         return self.entries
 
     def _bootstrap_binding(
@@ -62,9 +63,10 @@ class LOSourceStoreService:
         binding: LOBinding,
         lo_config: LOPackageConfig,
         source_path: Path,
+        km_dir: Path,
     ) -> LOSourceStoreEntry:
         store_path = resolve_lo_storage_path(source_path, lo_config.quad_store.storage_path)
-        manifest_path = source_path / SOURCE_SYNC_MANIFEST
+        manifest_path = lo_sync_manifest_path(km_dir, binding.ontology_id)
         current_checksums = compute_export_checksums(source_path)
         rebuild = needs_cache_rebuild(store_path, manifest_path, current_checksums)
 

@@ -89,7 +89,8 @@ get_system_status()
     ],
     "pending_exceptions_count": 0,
     "pending_mrs_count": 0,
-    "branch_merge_policy": "auto_merge_exception"
+    "branch_merge_policy": "auto_merge_exception",
+    "pending_branch_merges_count": 0
   }
 ```
 

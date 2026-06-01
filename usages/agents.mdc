@@ -11,7 +11,7 @@ You manage formal semantics alongside code. Every structural code change must be
 
 Before writing code or proposing plans:
 
-1. **`get_system_status`** — active Git branch, `branch_merge_policy`, loaded LO bindings (ontology_id, source, mode, cache sync).
+1. **`get_system_status`** — active Git branch, `branch_merge_policy`, `pending_branch_merges_count`, loaded LO bindings (ontology_id, source, mode, cache sync).
 2. **`km://schemas/learning-ontologies`** — available classes, properties, constraint boundaries (canonical graphs only).
 3. **`km://case/active-graph`** or **`query_semantic_graph`** — existing branch facts.
 
@@ -67,3 +67,12 @@ When a local pattern should become global LO policy:
 2. Prompt developer: `approve .km/mrs/mr-{ontology}-{id}.md`
 3. **`approve_semantic_mr`** with `doc_identifier` when developer approves.
 4. **`get_system_status`** — confirm LO cache refreshed.
+
+### Branch Case merge (after Git merge into main/master)
+
+When `pending_branch_merges_count > 0` or after merging a feature branch in Git:
+
+1. **`propose_branch_merge`** (`source_branch`, optional `target_branch`) — do **not** run `km merge-resolve` while `km mcp` is active (DB lock).
+2. Prompt developer with `approval_command` from the response (e.g. `resolve_branch_merge {event_id} MERGE`).
+3. On approval: **`resolve_branch_merge`** with `event_id` and `MERGE` | `KEEP_ISOLATED` | `DELETE`.
+4. Optional: read `km://case/pending-merges/{event_id}` for full prompt payload.

@@ -16,10 +16,17 @@ logger = get_logger("case_store")
 
 
 class CaseStoreService:
-    def __init__(self, workspace_root: Path, case_db_path: Path, exports_root: Path) -> None:
+    def __init__(
+        self,
+        workspace_root: Path,
+        case_db_path: Path,
+        exports_root: Path,
+        km_dir: Path,
+    ) -> None:
         self.workspace_root = workspace_root
         self.case_db_path = case_db_path
         self.exports_root = exports_root
+        self.km_dir = km_dir
         self.wrapper: QuadStoreWrapper | None = None
 
     def bootstrap(self) -> QuadStoreWrapper:
@@ -30,7 +37,9 @@ class CaseStoreService:
         has_exports = bool(current_checksums.get("graphs")) or bool(
             current_checksums.get("governance")
         )
-        rebuild = case_exports_need_rebuild(self.case_db_path, self.exports_root, current_checksums)
+        rebuild = case_exports_need_rebuild(
+            self.case_db_path, self.exports_root, self.km_dir
+        )
 
         if rebuild and has_exports:
             logger.info("Bootstrapping case store from case-exports")

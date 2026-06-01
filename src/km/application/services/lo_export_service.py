@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from pyoxigraph import NamedNode
 
 from km.application.services.lo_source_store_service import LOSourceStoreEntry
 from km.infrastructure.rdf.serialization import serialize_canonical_export, serialize_graph_block
-from km.infrastructure.rdf.store import compute_export_checksums, write_sync_manifest
 from km.logging_config import get_logger
 
 logger = get_logger("lo_export")
@@ -34,7 +31,6 @@ class LOExportService:
             "@prefix km: <http://km.local/governance#> .\n\n" + body,
             encoding="utf-8",
         )
-        self.refresh_source_manifest(entry)
         logger.info("Upserted governance export %s", export_path)
         return export_path
 
@@ -43,16 +39,5 @@ class LOExportService:
         quads = entry.wrapper.quads_in_graph(canonical_uri)
         export_path = entry.source_path / "exports" / "main.ttl"
         export_path.write_text(serialize_canonical_export(quads), encoding="utf-8")
-        self.refresh_source_manifest(entry)
         logger.info("Regenerated canonical export %s", export_path)
         return export_path
-
-    def refresh_source_manifest(self, entry: LOSourceStoreEntry) -> None:
-        checksums = compute_export_checksums(entry.source_path)
-        write_sync_manifest(
-            entry.manifest_path,
-            ontology_id=entry.binding.ontology_id,
-            source=str(entry.source_path),
-            mode=entry.binding.mode.value,
-            export_checksums=checksums,
-        )

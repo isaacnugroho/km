@@ -12,6 +12,7 @@ from km.logging_config import get_logger
 
 if TYPE_CHECKING:
     from km.application.services.exception_service import ExceptionService
+    from km.application.services.merge_prompt_store import MergePromptStore
     from km.application.services.merge_request_service import MergeRequestService
 
 logger = get_logger("status")
@@ -24,6 +25,7 @@ class SystemStatus:
     pending_exceptions_count: int
     pending_mrs_count: int
     branch_merge_policy: str
+    pending_branch_merges_count: int
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -32,6 +34,7 @@ class SystemStatus:
             "pending_exceptions_count": self.pending_exceptions_count,
             "pending_mrs_count": self.pending_mrs_count,
             "branch_merge_policy": self.branch_merge_policy,
+            "pending_branch_merges_count": self.pending_branch_merges_count,
         }
 
 
@@ -43,6 +46,7 @@ class StatusService:
         cache_entries: list[LOCacheEntry],
         exception_service: ExceptionService | None = None,
         merge_request_service: MergeRequestService | None = None,
+        merge_prompt_store: MergePromptStore | None = None,
     ) -> SystemStatus:
         lo_status: list[dict[str, Any]] = []
         for entry in cache_entries:
@@ -64,18 +68,25 @@ class StatusService:
         if merge_request_service is not None:
             pending_mrs = merge_request_service.count_pending()
 
+        pending_branch_merges = 0
+        if merge_prompt_store is not None:
+            pending_branch_merges = len(merge_prompt_store.list_pending())
+
         status = SystemStatus(
             active_branch=git_context.branch_path,
             learning_ontologies=lo_status,
             pending_exceptions_count=pending_exceptions,
             pending_mrs_count=pending_mrs,
             branch_merge_policy=config.branch_merge.policy.value,
+            pending_branch_merges_count=pending_branch_merges,
         )
         logger.info(
-            "System status: branch=%s, ontologies=%d, pending_exceptions=%d, pending_mrs=%d",
+            "System status: branch=%s, ontologies=%d, pending_exceptions=%d, "
+            "pending_mrs=%d, pending_branch_merges=%d",
             status.active_branch,
             len(lo_status),
             pending_exceptions,
             pending_mrs,
+            pending_branch_merges,
         )
         return status
