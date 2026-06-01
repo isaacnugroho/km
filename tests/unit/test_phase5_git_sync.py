@@ -24,7 +24,7 @@ def test_git_context_refresh_on_branch_switch(tmp_workspace: Path) -> None:
     _checkout(tmp_workspace, "feature/test", create=True)
     ctx = read_git_context(tmp_workspace)
     assert ctx.branch_path == "feature/test"
-    assert ctx.graph_uri == "http://km.local/graphs/feature/test"
+    assert ctx.graph_uri == "http://km.local/graphs/feature-test"
 
 
 def test_detect_parent_branch_from_reflog(tmp_workspace: Path) -> None:

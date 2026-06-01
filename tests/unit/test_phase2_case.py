@@ -25,7 +25,7 @@ def test_ref_mapping_round_trip() -> None:
     assert ref_to_export_filename(ref) == "refs-heads-feature-collaborative-canvas.ttl"
     branch = ref_to_branch_path(ref)
     assert branch == "feature/collaborative-canvas"
-    assert branch_path_to_graph_uri(branch) == "http://km.local/graphs/feature/collaborative-canvas"
+    assert branch_path_to_graph_uri(branch) == "http://km.local/graphs/feature-collaborative-canvas"
 
 
 def test_ingest_turtle(tmp_workspace: Path) -> None:

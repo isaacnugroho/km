@@ -30,7 +30,7 @@ graph TD
 
     subgraph Case_Ontology [Local Case Ontology: Active Workspace]
         direction TB
-        ActiveGraph["Active Branch Named Graph:<br>http://km.local/graphs/feature/collaborative-canvas"]
+        ActiveGraph["Active Branch Named Graph:<br>http://km.local/graphs/feature-collaborative-canvas"]
         CodeFact1["Fact: CollaborativeCanvas.tsx contains a UseEffectHook"]
         CodeFact2["Fact: CanvasDragEvent is a NetworkEvent"]
         LocalException["Exception: EphemeralCoordinatesBypass<br>(Human Authorized)"]
@@ -146,7 +146,7 @@ The local Case Ontology is configured to import **both** global learning ontolog
 ### Phase 1: Code Ingestion & Graph Registration
 The developer is working on Git branch `feature/collaborative-canvas`. They write the first draft of the React collaborative component `CollaborativeCanvas.tsx` and the network payload structures.
 
-The agent parses the AST of the proposed code and ingests these implementation details into the local Named Graph `http://km.local/graphs/feature/collaborative-canvas`.
+The agent parses the AST of the proposed code and ingests these implementation details into the local Named Graph `http://km.local/graphs/feature-collaborative-canvas`.
 
 #### Ingested Case Facts (JSON-LD)
 ```jsonld
@@ -210,7 +210,7 @@ It detects **two separate violations** originating from two different ontologies
 
 #### System Execution Log
 ```
-[KM MCP SHACL VALIDATOR] Validating active graph <http://km.local/graphs/feature/collaborative-canvas>...
+[KM MCP SHACL VALIDATOR] Validating active graph <http://km.local/graphs/feature-collaborative-canvas>...
 [KM MCP SHACL VALIDATOR] [VIOLATION 1/2] Focus: case:code/canvas_effect_1 (Shape: react:EffectCleanupShape)
   Message: useEffect hooks that instantiate WebSockets must return a cleanup function to avoid leaks.
 [KM MCP SHACL VALIDATOR] [VIOLATION 2/2] Focus: case:network/canvas_drag_event (Shape: dist:IdempotentMessageShape)
@@ -332,7 +332,7 @@ case-exports/
 │ Context/Named Graph URI                                │ Git Branch Association                   │ Git export file                                  │
 ├────────────────────────────────────────────────────────┼──────────────────────────────────────────┼──────────────────────────────────────────────────┤
 │ http://km.local/graphs/main                            │ refs/heads/main                          │ case-exports/graphs/refs-heads-main.ttl          │
-│ http://km.local/graphs/feature/collaborative-canvas    │ refs/heads/feature/collaborative-canvas  │ case-exports/graphs/refs-heads-feature-…       │
+│ http://km.local/graphs/feature-collaborative-canvas    │ refs/heads/feature/collaborative-canvas  │ case-exports/graphs/refs-heads-feature-…       │
 └────────────────────────────────────────────────────────┴──────────────────────────────────────────┴──────────────────────────────────────────────────┘
 ```
 

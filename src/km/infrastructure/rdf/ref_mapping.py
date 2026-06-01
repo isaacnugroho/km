@@ -18,10 +18,10 @@ def ref_to_branch_slug(git_ref: str) -> str:
 
 
 def branch_path_to_graph_uri(branch_path: str) -> str:
-    return f"{GRAPH_BASE}/{branch_path}"
+    return f"{GRAPH_BASE}/{branch_path_to_slug(branch_path)}"
 
 
-def graph_uri_to_branch_path(graph_uri: str) -> str:
+def graph_uri_to_branch_slug(graph_uri: str) -> str:
     prefix = f"{GRAPH_BASE}/"
     if not graph_uri.startswith(prefix):
         raise ValueError(f"Not a case branch graph URI: {graph_uri}")

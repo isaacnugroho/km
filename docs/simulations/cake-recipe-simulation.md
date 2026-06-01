@@ -26,7 +26,7 @@ graph TD
 
     subgraph Case_Ontology [Local Case Ontology: Workspace / Active Case]
         direction TB
-        CO_Branch["Active Branch Named Graph:<br>http://km.local/graphs/feature/lavender-cocoa-chiffon"]
+        CO_Branch["Active Branch Named Graph:<br>http://km.local/graphs/feature-lavender-cocoa-chiffon"]
         CO_Fact1["Fact: High-Fat Cocoa Powder is an Ingredient"]
         CO_Fact2["Fact: Lavender Essential Oil contains Linalool"]
         CO_Exception["Exception: EmulsifiedBloomedFatFolding<br>(Human Authorized)"]
@@ -130,7 +130,7 @@ The agent ingests the initial recipe specifications:
 *   **Fat:** 50g Vegetable Oil + 40g High-Fat Dutch-Processed Cocoa Powder (which contains 22% cocoa butter fat)
 *   **Flavoring:** 10 drops of Lavender Essential Oil
 
-The agent registers these facts into the active Git branch named graph `http://km.local/graphs/feature/lavender-cocoa-chiffon`.
+The agent registers these facts into the active Git branch named graph `http://km.local/graphs/feature-lavender-cocoa-chiffon`.
 
 ```jsonld
 {
@@ -323,7 +323,7 @@ case-exports/
 │ Context/Named Graph URI                                │ Git Branch Association                   │ Git export file                             │
 ├────────────────────────────────────────────────────────┼──────────────────────────────────────────┼─────────────────────────────────────────────┤
 │ http://km.local/graphs/main                            │ refs/heads/main                          │ case-exports/graphs/refs-heads-main.ttl     │
-│ http://km.local/graphs/feature/lavender-cocoa-chiffon  │ refs/heads/feature/lavender-cocoa-chiffon│ case-exports/graphs/refs-heads-feature-…  │
+│ http://km.local/graphs/feature-lavender-cocoa-chiffon  │ refs/heads/feature/lavender-cocoa-chiffon│ case-exports/graphs/refs-heads-feature-…  │
 └────────────────────────────────────────────────────────┴──────────────────────────────────────────┴─────────────────────────────────────────────┘
 ```
 
@@ -346,7 +346,7 @@ git checkout main
 
 1.  The KM Daemon monitors `.git/HEAD`.
 2.  It detects a change from `ref: refs/heads/feature/lavender-cocoa-chiffon` to `ref: refs/heads/main`.
-3.  The KM MCP system seamlessly swaps its active query target from `http://km.local/graphs/feature/lavender-cocoa-chiffon` to `http://km.local/graphs/main`.
+3.  The KM MCP system seamlessly swaps its active query target from `http://km.local/graphs/feature-lavender-cocoa-chiffon` to `http://km.local/graphs/main`.
 4.  The Lavender-specific exceptions and facts disappear from the active context, leaving `main` clean and unpolluted.
 
 #### 3.2 Branch Merging Logic

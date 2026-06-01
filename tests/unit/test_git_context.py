@@ -23,7 +23,7 @@ def test_feature_branch_ref(tmp_path: Path) -> None:
 
     ctx = read_git_context(tmp_path)
     assert ctx.branch_path == "feature/foo"
-    assert ctx.graph_uri == "http://km.local/graphs/feature/foo"
+    assert ctx.graph_uri == "http://km.local/graphs/feature-foo"
 
 
 def test_no_git_defaults_to_main(tmp_path: Path) -> None:

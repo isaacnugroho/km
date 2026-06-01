@@ -136,7 +136,7 @@ ingest_case_facts({
 → { "status": "success", "triples_added": 3 }
 ```
 
-Confirm `triples_added > 0`. Facts land in the named graph for the active Git branch (e.g. `http://km.local/graphs/feature/collaborative-canvas`).
+Confirm `triples_added > 0`. Facts land in the named graph for the active Git branch (e.g. `http://km.local/graphs/feature-collaborative-canvas`).
 
 ---
 

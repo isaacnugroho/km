@@ -67,7 +67,7 @@ The Case Ontology models the dynamic, situational reality of the active workspac
 *   **Runtime storage:** `.km/case_quads.db` (Git ignored).
 *   **Git authority:** `case-exports/` at the workspace root (sibling to `.km/`), containing per-branch graph files and per-event governance shards.
 *   **Structure:** Implemented as an RDF Quad-Store with Named Graphs mapped 1:1 to Git branches:
-    *   **Branch graphs** — `http://km.local/graphs/{branch-path}`: dynamic case facts and approved `km:LocalException` triples for that branch.
+    *   **Branch graphs** — `http://km.local/graphs/{branch-slug}`: dynamic case facts and approved `km:LocalException` triples for that branch. `{branch-slug}` is derived from the Git branch path by replacing non-alphanumeric runs with `-` (e.g. `feature/collaborative-canvas` → `feature-collaborative-canvas`).
     *   **Workspace governance graph** — `http://km.local/case/governance`: branch-merge resolutions and other workspace-level audit records (exported under `case-exports/governance/`).
 *   **Lifecycle:** Dynamically updated by the agent at runtime (e.g., AST parse results, process flow discoveries). Bypasses global rules only via structured local exceptions signed off by the developer. Export writes follow `case_exports.export_policy` in `.km/config.json` (see §2.6).
 
@@ -329,7 +329,7 @@ Sanitize the full ref path for a stable filename:
 | `refs/heads/main`                         | `graphs/refs-heads-main.ttl`                         |
 | `refs/heads/feature/collaborative-canvas` | `graphs/refs-heads-feature-collaborative-canvas.ttl` |
 
-Rules: replace `/` with `-`; prefix with `refs-heads-` (or `refs-` for non-head refs). The `GRAPH` URI inside the file MUST be `http://km.local/graphs/{branch-path}` where `{branch-path}` is the path after `refs/heads/` (e.g. `feature/collaborative-canvas`).
+Rules: replace `/` with `-`; prefix with `refs-heads-` (or `refs-` for non-head refs). The `GRAPH` URI inside the file MUST be `http://km.local/graphs/{branch-slug}` where `{branch-slug}` is the slug of the path after `refs/heads/` (e.g. `refs/heads/feature/collaborative-canvas` → `http://km.local/graphs/feature-collaborative-canvas`). Distinct branch paths that slug to the same string cannot have separate Case graphs.
 
 #### Turtle serialization (same rules as LO exports)
 *   Each graph file contains exactly one `GRAPH <uri> { ... }` block.
@@ -355,7 +355,7 @@ On MCP startup (or when `case_quads.db` is missing/stale):
 ┌────────────────────────────────────────────────────────┬──────────────────────────────────────────┐
 │ Named Graph URI                                        │ Git / export mapping                     │
 ├────────────────────────────────────────────────────────┼──────────────────────────────────────────┤
-│ http://km.local/graphs/{branch-path}                 │ case-exports/graphs/{sanitized-ref}.ttl  │
+│ http://km.local/graphs/{branch-slug}                 │ case-exports/graphs/{sanitized-ref}.ttl  │
 │ http://km.local/case/governance                      │ case-exports/governance/*.ttl            │
 └────────────────────────────────────────────────────────┴──────────────────────────────────────────┘
 ```
@@ -369,7 +369,7 @@ Written to `case-exports/governance/{event-id}.ttl` when the developer completes
 
 GRAPH <http://km.local/case/governance> {
     km:merge-feature-canvas-20260530 a km:BranchMergeResolution ;
-        km:sourceGraph <http://km.local/graphs/feature/collaborative-canvas> ;
+        km:sourceGraph <http://km.local/graphs/feature-collaborative-canvas> ;
         km:targetGraph <http://km.local/graphs/main> ;
         km:resolution "MERGE" ;
         km:policy "auto_merge_exception" ;
@@ -418,7 +418,7 @@ graph TD
 
 ### 3.3 Scoped Named Graph Queries
 All read-write transactions are targeted specifically to a scoped graph rather than scanning the entire quad-store:
-*   **Case Ontology:** SPARQL queries restrict search boundaries utilizing explicit `GRAPH <http://km.local/graphs/feature/active-branch>` blocks.
+*   **Case Ontology:** SPARQL queries restrict search boundaries utilizing explicit `GRAPH <http://km.local/graphs/feature-active-branch>` blocks (slug form).
 *   **Learning Ontologies:** Agent-facing reads and validations scope to `GRAPH <http://km.local/learning-ontologies/{id}/canonical>` only. Proposal graphs are never included in default query unions.
 *   This narrows the search space to the exact delta representing the active branch's Case facts, capping search times under 5ms.
 
@@ -790,7 +790,7 @@ Both Learning Ontologies and the Case Ontology use the same **runtime vs export*
 2.  **State Extraction:** Upon modification, the daemon extracts the reference pointer (e.g., `ref: refs/heads/feature/collaborative-canvas`).
 3.  **Context Swapping:** The daemon dynamically remaps the active Named Graph query scope inside `pyoxigraph` to match the branch signature:
     ```
-    http://km.local/graphs/feature/collaborative-canvas
+    http://km.local/graphs/feature-collaborative-canvas
     ```
 4.  **Completion:** All subsequent tool executions are scoped strictly to the new named graph context.
 
@@ -798,7 +798,7 @@ Both Learning Ontologies and the Case Ontology use the same **runtime vs export*
 graph TD
     Checkout["git checkout new-branch"] -->|inotify Event| HEAD[".git/HEAD modified"]
     HEAD -->|Read HEAD| Extract["Extract Branch 'new-branch'"]
-    Extract --> Map["Map Graph Context URI to:<br>&lt;http://km.local/graphs/feature/new-branch&gt;"]
+    Extract --> Map["Map Graph Context URI to:<br>&lt;http://km.local/graphs/feature-new-branch&gt;"]
 
     style Checkout fill:#1a233a,stroke:#3b82f6,stroke-width:2px,color:#fff
     style HEAD fill:#1e1b29,stroke:#8b5cf6,stroke-width:2px,color:#fff
@@ -808,7 +808,7 @@ graph TD
 
 ### 5.2 Branch Inheritance & Fallback Logic
 When a developer switches to a newly initialized branch:
-*   The active graph context checks if the graph `http://km.local/graphs/feature/new-branch` contains triples.
+*   The active graph context checks if the graph `http://km.local/graphs/feature-new-branch` contains triples.
 *   **Inheritance Mechanism:** If the graph is empty, the daemon checks the Git tracking information (using `git merge-base` or `.git/logs/HEAD`) to identify the direct parent branch (e.g. `main`).
 *   **Clone-on-Write Copying:** The daemon copy-clones all triples from the parent's named graph (`http://km.local/graphs/main`) into the new branch's named graph, providing the agent with immediate architectural and process contextual memories from the parent branch.
 *   **Export (optional):** After inheritance, the daemon MAY write `case-exports/graphs/{sanitized-new-ref}.ttl` from the cloned graph so the new branch's export exists before the first ingest.

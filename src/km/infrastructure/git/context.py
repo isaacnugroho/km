@@ -5,11 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from km.infrastructure.rdf.ref_mapping import GRAPH_BASE, branch_path_to_graph_uri
 from km.logging_config import get_logger
 
 logger = get_logger("git.context")
-
-GRAPH_BASE = "http://km.local/graphs"
 
 
 @dataclass(frozen=True)
@@ -70,5 +69,5 @@ def _context_from_branch(branch_path: str, active_ref: str | None = None) -> Git
     return GitContext(
         active_ref=ref,
         branch_path=branch_path,
-        graph_uri=f"{GRAPH_BASE}/{branch_path}",
+        graph_uri=branch_path_to_graph_uri(branch_path),
     )
