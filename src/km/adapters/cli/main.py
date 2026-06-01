@@ -11,11 +11,12 @@ from km.application.bootstrap import KMApplication
 from km.application.services.feature_gate import require_implemented
 from km.application.services.workspace_service import init_workspace
 from km.exceptions import FeatureNotImplementedError, KmError, as_km_error
+from km.infrastructure.bundle import bundle_resource_path
 from km.logging_config import configure_logging, get_logger
 
 logger = get_logger("cli")
 
-HOOK_TEMPLATE = Path(__file__).resolve().parent.parent / "hooks" / "pre-commit.km.sh"
+HOOK_TEMPLATE = bundle_resource_path("adapters", "hooks", "pre-commit.km.sh")
 
 
 def main() -> None:

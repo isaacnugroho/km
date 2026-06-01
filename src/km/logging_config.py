@@ -19,8 +19,13 @@ def configure_logging(
     """Configure root logging for KM.
 
     All handlers write to stderr (or file) — never stdout — so MCP JSON-RPC is safe.
+    In MCP mode the default stderr level is WARNING so IDE clients do not treat
+    INFO lines as server errors (they monitor stderr).
     """
-    log_level = (level or os.environ.get("KM_LOG_LEVEL", "INFO")).upper()
+    if level is None and mcp_mode and "KM_LOG_LEVEL" not in os.environ:
+        log_level = "WARNING"
+    else:
+        log_level = (level or os.environ.get("KM_LOG_LEVEL", "INFO")).upper()
     numeric_level = getattr(logging, log_level, logging.INFO)
 
     root = logging.getLogger("km")

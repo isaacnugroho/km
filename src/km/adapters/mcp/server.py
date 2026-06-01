@@ -12,7 +12,7 @@ from km.logging_config import configure_logging, get_logger
 
 logger = get_logger("mcp.server")
 
-mcp = FastMCP("km")
+mcp = FastMCP("km", log_level="WARNING")
 
 
 def _get_app() -> KMApplication:
@@ -158,7 +158,23 @@ def mr_review_doc(ontology_id: str, mr_id: str) -> str:
     return content
 
 
+def _register_resource_subscription_stubs() -> None:
+    """Accept IDE subscribe/unsubscribe calls; KM resources are not push-updated."""
+    server = mcp._mcp_server
+
+    @server.subscribe_resource()
+    async def _subscribe_resource(uri) -> None:
+        logger.debug("Resource subscribe accepted (no live updates): %s", uri)
+
+    @server.unsubscribe_resource()
+    async def _unsubscribe_resource(uri) -> None:
+        logger.debug("Resource unsubscribe accepted: %s", uri)
+
+
+_register_resource_subscription_stubs()
+
+
 def run_mcp_server() -> None:
     configure_logging(mcp_mode=True)
-    logger.info("Starting KM MCP server (stdio)")
+    logger.debug("Starting KM MCP server (stdio)")
     mcp.run(transport="stdio")

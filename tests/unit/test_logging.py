@@ -21,3 +21,9 @@ def test_no_stdout_handlers_in_mcp_mode() -> None:
     logger = logging.getLogger("km")
     for handler in logger.handlers:
         assert getattr(handler, "stream", None) is not sys.stdout
+
+
+def test_mcp_mode_defaults_to_warning(monkeypatch) -> None:
+    monkeypatch.delenv("KM_LOG_LEVEL", raising=False)
+    configure_logging(mcp_mode=True)
+    assert logging.getLogger("km").level == logging.WARNING

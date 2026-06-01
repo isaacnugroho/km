@@ -116,6 +116,7 @@ def build(
         "--hidden-import=km.adapters.mcp.resources",
         "--hidden-import=mcp.server.fastmcp",
         "--collect-submodules=km",
+        "--collect-data=km",
         "--collect-all=pyoxigraph",
         "--collect-all=pyshacl",
         "--copy-metadata=km",
