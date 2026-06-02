@@ -6,6 +6,9 @@ import threading
 from collections.abc import Callable
 from pathlib import Path
 
+from watchdog.events import FileSystemEvent, FileSystemEventHandler
+from watchdog.observers import Observer
+
 from km.logging_config import get_logger
 
 logger = get_logger("git.ref_watcher")
@@ -26,9 +29,6 @@ class RefWatcher:
         self._observer = None
 
     def start(self) -> None:
-        from watchdog.events import FileSystemEventHandler
-        from watchdog.observers import Observer
-
         git_dir = self.workspace_root / ".git"
         if not git_dir.is_dir():
             logger.warning("No .git directory; git watcher not started")
@@ -67,15 +67,16 @@ class RefWatcher:
             logger.exception("Git ref watcher handler failed")
 
 
-class _GitRefHandler:
+class _GitRefHandler(FileSystemEventHandler):
     def __init__(self, callback: Callable[[], None]) -> None:
+        super().__init__()
         self.callback = callback
 
-    def on_modified(self, _event: object) -> None:
+    def on_modified(self, _event: FileSystemEvent) -> None:
         self.callback()
 
-    def on_created(self, _event: object) -> None:
+    def on_created(self, _event: FileSystemEvent) -> None:
         self.callback()
 
-    def on_moved(self, _event: object) -> None:
+    def on_moved(self, _event: FileSystemEvent) -> None:
         self.callback()
