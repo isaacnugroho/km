@@ -101,10 +101,6 @@ GRAPH <http://km.local/graphs/main> {
     <http://app.local/km#OxigraphQuadStore> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#DrivenAdapter> .
     <http://app.local/km#OxigraphQuadStore> <http://www.w3.org/2000/01/rdf-schema#label> "PyOxigraph Quad Store"^^<http://www.w3.org/2001/XMLSchema#string> .
     <http://app.local/km#OxigraphQuadStore> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <file://src/km/infrastructure/rdf/store.py> .
-    <http://app.local/km#PreCommitHookAdapter> <http://architecture.org/hexagonal#invokes> <http://app.local/km#CaseExportPort> .
-    <http://app.local/km#PreCommitHookAdapter> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#DrivingAdapter> .
-    <http://app.local/km#PreCommitHookAdapter> <http://www.w3.org/2000/01/rdf-schema#label> "Pre-commit Hook Adapter"^^<http://www.w3.org/2001/XMLSchema#string> .
-    <http://app.local/km#PreCommitHookAdapter> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <file://src/km/adapters/hooks/pre-commit.km.sh> .
     <http://app.local/km#QuadStorePort> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#DrivenPort> .
     <http://app.local/km#QuadStorePort> <http://www.w3.org/2000/01/rdf-schema#label> "RDF Quad Store Port"^^<http://www.w3.org/2001/XMLSchema#string> .
     <http://app.local/km#QueryPort> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#DrivingPort> .

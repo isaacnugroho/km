@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from rdflib import BNode, Graph, Literal, Namespace, URIRef
 from rdflib.namespace import OWL, RDF, RDFS, SH, XSD
@@ -14,36 +15,58 @@ from km.logging_config import get_logger
 
 logger = get_logger("shacl_cache")
 
+KM_LEARNING_ONTOLOGY = "http://km.local/learning-ontologies/"
+
 
 def lo_prefix_name(ontology_id: str) -> str:
-    """Return the SPARQL prefix label used for an LO binding."""
-    if ontology_id == "hexagonal-architecture":
-        return "hex"
+    """Return the canonical SPARQL prefix label for an LO binding (from ontology_id)."""
     return ontology_id.replace("-", "_")
+
+
+def lo_ontology_uri(ontology_id: str) -> str:
+    """Named resource anchoring sh:declare / sh:prefixes for an LO binding."""
+    return f"{KM_LEARNING_ONTOLOGY}{ontology_id}"
+
+
+def collect_export_prefixes(source_path: Path) -> dict[str, str]:
+    """Read @prefix declarations from LO exports/main.ttl (authoritative for SPARQL in shapes)."""
+    main_ttl = source_path / "exports" / "main.ttl"
+    if not main_ttl.is_file():
+        return {}
+    parsed = Graph()
+    parsed.parse(main_ttl, format="turtle")
+    bindings: dict[str, str] = {}
+    for prefix, namespace in parsed.namespace_manager.namespaces():
+        bindings[str(prefix)] = str(namespace)
+    return bindings
 
 
 def inject_lo_sparql_prefixes(
     graph: Graph,
     ontology_uri: str,
-    prefix: str,
-    namespace_uri: str,
+    prefix_bindings: dict[str, str],
 ) -> None:
     """Inject sh:declare and sh:prefixes so pyshacl resolves LO prefixes in SPARQL constraints."""
     ont = URIRef(ontology_uri.rstrip("#/"))
-    ns = URIRef(namespace_uri if namespace_uri.endswith("#") else f"{namespace_uri.rstrip('/')}#")
 
-    declare_node: BNode | URIRef | None = None
-    for dec in graph.objects(ont, SH.declare):
-        existing_prefix = graph.value(dec, SH.prefix)
-        if existing_prefix == Literal(prefix):
-            declare_node = dec
-            break
+    for prefix, namespace_uri in sorted(prefix_bindings.items()):
+        ns = URIRef(
+            namespace_uri
+            if namespace_uri.endswith("#")
+            else f"{namespace_uri.rstrip('/')}#"
+        )
+        declare_node: BNode | URIRef | None = None
+        for dec in graph.objects(ont, SH.declare):
+            existing_prefix = graph.value(dec, SH.prefix)
+            if existing_prefix == Literal(prefix):
+                declare_node = dec
+                break
 
-    if declare_node is None:
-        declare_node = BNode()
-        graph.add((ont, SH.declare, declare_node))
-        graph.add((declare_node, SH.prefix, Literal(prefix)))
-        graph.add((declare_node, SH.namespace, Literal(str(ns), datatype=XSD.anyURI)))
+        if declare_node is None:
+            declare_node = BNode()
+            graph.add((ont, SH.declare, declare_node))
+            graph.add((declare_node, SH.prefix, Literal(prefix)))
+            graph.add((declare_node, SH.namespace, Literal(str(ns), datatype=XSD.anyURI)))
 
     if (ont, RDF.type, OWL.Ontology) not in graph:
         graph.add((ont, RDF.type, OWL.Ontology))
@@ -112,15 +135,22 @@ class ShaclCache:
                 quads = wrapper.quads_in_graph(canonical_uri)
                 lo_graph = _quads_to_rdflib(quads)
                 prefix_base = entry.lo_config.base_uri.rstrip("#/")
-                ns = Namespace(f"{prefix_base}#")
-                prefix = lo_prefix_name(entry.binding.ontology_id)
-                merged.bind(prefix, ns)
-                prefix_bindings[prefix] = str(ns)
-                for prefix_name, ns_uri in lo_graph.namespace_manager.namespaces():
-                    merged.bind(prefix_name, ns_uri)
+                primary_ns = f"{prefix_base}#"
+                primary_prefix = lo_prefix_name(entry.binding.ontology_id)
+                lo_prefixes = collect_export_prefixes(entry.source_path)
+                lo_prefixes[primary_prefix] = primary_ns
+
+                for prefix_name, ns_uri in lo_prefixes.items():
+                    merged.bind(prefix_name, Namespace(ns_uri))
+                    prefix_bindings[prefix_name] = ns_uri
+
                 for triple in lo_graph:
                     merged.add(triple)
-                inject_lo_sparql_prefixes(merged, entry.lo_config.base_uri, prefix, str(ns))
+                inject_lo_sparql_prefixes(
+                    merged,
+                    entry.lo_config.base_uri,
+                    lo_prefixes,
+                )
 
                 for _ in lo_graph.subjects(RDF.type, URIRef("http://www.w3.org/ns/shacl#NodeShape")):
                     shape_count += 1

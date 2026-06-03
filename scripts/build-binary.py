@@ -12,7 +12,6 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 ENTRY = REPO_ROOT / "src" / "km" / "adapters" / "cli" / "main.py"
-HOOK_TEMPLATE = REPO_ROOT / "src" / "km" / "adapters" / "hooks" / "pre-commit.km.sh"
 DEFAULT_DIST = REPO_ROOT / "dist"
 DEFAULT_BUILD = REPO_ROOT / "build"
 DEFAULT_SPEC = REPO_ROOT / "scripts" / "pyinstaller"
@@ -33,10 +32,6 @@ def platform_tag() -> str:
     if system == "windows":
         return f"windows-{arch}"
     return f"linux-{arch}"
-
-
-def add_data_separator() -> str:
-    return ";" if platform.system() == "Windows" else ":"
 
 
 def expected_platforms() -> set[str]:
@@ -61,13 +56,8 @@ def check_platform(requested: str | None) -> None:
 
 
 def ensure_prerequisites() -> None:
-    missing: list[str] = []
     if not ENTRY.is_file():
-        missing.append(str(ENTRY))
-    if not HOOK_TEMPLATE.is_file():
-        missing.append(str(HOOK_TEMPLATE))
-    if missing:
-        raise SystemExit("Missing required files:\n  " + "\n  ".join(missing))
+        raise SystemExit(f"Missing required file: {ENTRY}")
 
     try:
         import PyInstaller  # noqa: F401
@@ -92,7 +82,6 @@ def build(
     workpath.mkdir(parents=True, exist_ok=True)
     specpath.mkdir(parents=True, exist_ok=True)
 
-    hook_data = f"{HOOK_TEMPLATE}{add_data_separator()}km/adapters/hooks"
     cmd = [
         sys.executable,
         "-m",
@@ -124,8 +113,6 @@ def build(
         "--copy-metadata=pyoxigraph",
         "--copy-metadata=pyshacl",
         "--copy-metadata=rdflib",
-        "--add-data",
-        hook_data,
         str(ENTRY),
     ]
 

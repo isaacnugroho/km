@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('src/km/adapters/hooks/pre-commit.km.sh', 'km/adapters/hooks')]
+datas = []
 binaries = []
 hiddenimports = ['km.adapters.mcp.server', 'mcp.server.fastmcp']
 tmp_ret = collect_all('pyoxigraph')

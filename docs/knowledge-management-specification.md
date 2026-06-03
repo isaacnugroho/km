@@ -154,7 +154,7 @@ Controls when the daemon writes Git-authoritative Case export files (see §2.6).
 
 | Config value | Behavior                                                                                                                                                                                     |
 | :----------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `on_commit`  | **Default (recommended).** Export active branch graph and pending governance on `git commit` (hook) or explicit `km export-case`. Avoids rewriting graph files on every `ingest_case_facts`. |
+| `on_commit`  | **Default (recommended).** Export active branch graph and pending governance via explicit `km export-case` before commit. Avoids rewriting graph files on every `ingest_case_facts`. |
 | `on_write`   | Upsert `case-exports/graphs/{ref}.ttl` after each mutating Case MCP tool (higher churn; use only for small workspaces).                                                                      |
 | `manual`     | Export only when the developer runs `km export-case`.                                                                                                                                        |
 

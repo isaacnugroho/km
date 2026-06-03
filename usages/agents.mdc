@@ -7,6 +7,16 @@ alwaysApply: true
 
 You manage formal semantics alongside code. Every structural code change must be reflected, verified, and constrained in the semantic layer (Case Ontology RDF graph vs Learning Ontology SHACL shapes).
 
+## Protected: `.km/config.json`
+
+**Never** create, edit, delete, or overwrite `.km/config.json` unless the user explicitly asks you to change workspace configuration in this conversation.
+
+- LO bindings, `case_exports`, and `branch_merge` policy are **developer-owned**.
+- Do not rewrite config to add LOs, change `mode`, fix paths, or “repair” MCP errors.
+- Use **`get_system_status`** and **`km://schemas/learning-ontologies`** for bindings — not direct file edits.
+- If bindings must change, describe the exact JSON diff and let the user edit the file or run `km init` themselves.
+- Do not use the shell (`cp`, `tee`, `jq`, redirects, etc.) to modify this file.
+
 ## Phase 1 — Context Ingestion (task start)
 
 Before writing code or proposing plans:

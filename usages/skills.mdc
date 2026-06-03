@@ -9,7 +9,7 @@ Reusable recipes for Knowledge Management MCP operations. Execute these during d
 
 ## Skill 1: AST-to-RDF Fact Extraction
 
-**When:** After modifying code files (components, endpoints, schemas, configs).
+**When:** After modifying code files (components, endpoints, schemas, application configs). Never edit `.km/config.json` (see agents rule — developer-owned).
 
 1. Scan modified files; parse AST or configuration structure.
 2. Look up allowed classes/relations in `km://schemas/learning-ontologies`.

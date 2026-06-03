@@ -57,7 +57,6 @@ Phase 5 adds Git-aligned case lifecycle:
 - `propose_branch_merge` / `resolve_branch_merge` MCP tools — resolve pending merges while `km mcp` is running
 - `km merge-resolve` — headless/CI only when MCP is stopped (parallel CLI locks `case_quads.db`)
 - `km export-case` — export active branch graph + manifest
-- `km init --with-hooks` — install pre-commit hook for `on_commit` export policy
 
 ## Install
 
@@ -79,8 +78,6 @@ Initialize a workspace in your project root (creates `.km/config.json` and `case
 
 ```bash
 km init
-# optional: install pre-commit hook when export_policy is on_commit
-km init --with-hooks
 ```
 
 Print system status:
@@ -180,7 +177,7 @@ Resources: eight MCP resources are implemented (`km://schemas/learning-ontologie
 
 | Command                               | Description                                                                                |
 | :------------------------------------ | :----------------------------------------------------------------------------------------- |
-| `km init [--path DIR] [--with-hooks]` | Create `.km/config.json` and case-exports dirs                                             |
+| `km init [--path DIR]`                | Create `.km/config.json` and case-exports dirs                                             |
 | `km status`                           | Print system status JSON                                                                   |
 | `km mcp`                              | Start MCP stdio server (enables git watcher)                                               |
 | `km export-case`                      | Export active branch graph to `case-exports/`                                              |

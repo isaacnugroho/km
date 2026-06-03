@@ -1,0 +1,3 @@
+# Developer-owned workspace binding; agents must not read or rewrite via editor tools.
+# See usages/agents.mdc — use get_system_status / MCP for bindings; ask the user to edit config.
+.km/config.json

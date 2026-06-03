@@ -11,12 +11,9 @@ from km.application.bootstrap import KMApplication
 from km.application.services.feature_gate import require_implemented
 from km.application.services.workspace_service import init_workspace
 from km.exceptions import FeatureNotImplementedError, KmError, as_km_error
-from km.infrastructure.bundle import bundle_resource_path
 from km.logging_config import configure_logging, get_logger
 
 logger = get_logger("cli")
-
-HOOK_TEMPLATE = bundle_resource_path("adapters", "hooks", "pre-commit.km.sh")
 
 
 def main() -> None:
@@ -38,11 +35,6 @@ def run_cli(argv: list[str] | None = None) -> int:
         "--lo-source",
         default=None,
         help="Relative path to LO package for default binding",
-    )
-    init_parser.add_argument(
-        "--with-hooks",
-        action="store_true",
-        help="Install pre-commit hook template for on_commit export policy",
     )
 
     sub.add_parser("status", help="Print system status JSON")
@@ -66,7 +58,7 @@ def run_cli(argv: list[str] | None = None) -> int:
 
     try:
         if args.command == "init":
-            cmd_init(args.path, lo_source=args.lo_source, with_hooks=args.with_hooks)
+            cmd_init(args.path, lo_source=args.lo_source)
         elif args.command == "status":
             cmd_status()
         elif args.command == "mcp":
@@ -93,34 +85,9 @@ def run_cli(argv: list[str] | None = None) -> int:
     return 0
 
 
-def cmd_init(path: Path, *, lo_source: str | None, with_hooks: bool = False) -> None:
+def cmd_init(path: Path, *, lo_source: str | None) -> None:
     config_path = init_workspace(path, lo_source=lo_source)
     print(f"Initialized workspace config at {config_path}")
-    if with_hooks:
-        install_pre_commit_hook(path.resolve())
-
-
-def install_pre_commit_hook(workspace_root: Path) -> Path:
-    if not HOOK_TEMPLATE.is_file():
-        raise KmError(f"Missing hook template: {HOOK_TEMPLATE}")
-    hooks_dir = workspace_root / ".git" / "hooks"
-    if not hooks_dir.is_dir():
-        raise KmError(f"No .git/hooks directory at {workspace_root}")
-    hook_path = hooks_dir / "pre-commit"
-    marker = "# km export-case"
-    template = HOOK_TEMPLATE.read_text(encoding="utf-8")
-    if hook_path.is_file():
-        existing = hook_path.read_text(encoding="utf-8")
-        if marker in existing:
-            print(f"KM hook already present in {hook_path}")
-            return hook_path
-        content = existing.rstrip() + "\n\n" + template
-    else:
-        content = template
-    hook_path.write_text(content, encoding="utf-8")
-    hook_path.chmod(hook_path.stat().st_mode | 0o755)
-    print(f"Installed KM pre-commit hook at {hook_path}")
-    return hook_path
 
 
 def cmd_status() -> None:

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from km.adapters.cli.main import cmd_export_case, install_pre_commit_hook, run_cli
+from km.adapters.cli.main import cmd_export_case, run_cli
 from km.application.services.workspace_service import init_workspace
 
 
@@ -19,6 +19,19 @@ def test_cmd_init_creates_config(tmp_path: Path, lo_package: Path) -> None:
     data = json.loads(config_path.read_text())
     assert data["learning_ontologies"][0]["ontology_id"] == "hexagonal-architecture"
     assert (ws / "case-exports" / "graphs").is_dir()
+
+
+def test_init_workspace_does_not_overwrite_existing_config(
+    tmp_path: Path, lo_package: Path
+) -> None:
+    ws = tmp_path / "proj"
+    km_dir = ws / ".km"
+    km_dir.mkdir(parents=True)
+    config_path = km_dir / "config.json"
+    original = {"workspace_id": "keep-me", "learning_ontologies": []}
+    config_path.write_text(json.dumps(original), encoding="utf-8")
+    init_workspace(ws, lo_source=str(lo_package))
+    assert json.loads(config_path.read_text()) == original
 
 
 def test_cmd_export_case_writes_graph_file(
@@ -41,12 +54,6 @@ def test_cmd_export_case_writes_graph_file(
     assert "my_core" in export_path.read_text(encoding="utf-8")
     manifest = tmp_workspace / ".km" / "main_sync-manifest.json"
     assert manifest.is_file()
-
-
-def test_install_pre_commit_hook(tmp_workspace: Path) -> None:
-    hook_path = install_pre_commit_hook(tmp_workspace)
-    assert hook_path.is_file()
-    assert "km export-case" in hook_path.read_text(encoding="utf-8")
 
 
 def test_run_cli_merge_resolve_unknown_event(tmp_path: Path, lo_package: Path) -> None:

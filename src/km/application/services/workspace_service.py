@@ -83,6 +83,12 @@ def init_workspace(target: Path, *, lo_source: str | None = None) -> Path:
         "branch_merge": {"policy": "auto_merge_exception"},
     }
     config_path = km_dir / "config.json"
+    if config_path.exists():
+        logger.warning(
+            "Skipping config write: %s already exists (refusing to overwrite)",
+            config_path,
+        )
+        return config_path
     config_path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
 
     (target / "case-exports" / "graphs").mkdir(parents=True, exist_ok=True)
