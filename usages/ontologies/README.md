@@ -13,7 +13,7 @@ Every bindable LO directory MUST contain at least:
 ```
 {ontology-id}/
 ├── README.md              # Domain purpose, vocabulary summary, case-fact examples
-├── config.json            # ontology_id, base_uri, quad_store, named_graphs
+├── config.json            # ontology_id, base_uri, prefix, quad_store, named_graphs
 └── exports/
     └── main.ttl           # Git-authoritative canonical graph (vocabulary + SHACL)
 ```
@@ -49,6 +49,7 @@ Required fields (see [hexagonal-architecture/config.json](hexagonal-architecture
 {
   "ontology_id": "hexagonal-architecture",
   "base_uri": "http://architecture.org/hexagonal",
+  "prefix": "hex",
   "quad_store": {
     "engine": "sqlite-quad",
     "storage_path": "./lo_quads.db"
@@ -63,7 +64,8 @@ Required fields (see [hexagonal-architecture/config.json](hexagonal-architecture
 | Field                     | Requirement                                                                                        |
 | :------------------------ | :------------------------------------------------------------------------------------------------- |
 | `ontology_id`             | Stable slug; MUST match `ontology_id` in the workspace binding and SHOULD match the directory name |
-| `base_uri`                | Public ontology IRI for domain terms (used in Turtle prefixes)                                     |
+| `base_uri`                | Public ontology IRI for domain terms (namespace root; trailing `#` added for Turtle)               |
+| `prefix`                  | SPARQL/Turtle prefix for domain terms (e.g. `hex:`); defaults to `ontology_id` with `-` → `_`      |
 | `named_graphs.canonical`  | `http://km.local/learning-ontologies/{ontology_id}/canonical`                                      |
 | `named_graphs.governance` | `http://km.local/learning-ontologies/{ontology_id}/governance`                                     |
 
@@ -147,6 +149,6 @@ See each package's `README.md` for vocabulary tables, SHACL shape summaries, and
 2. Define vocabulary and SHACL in `main.ttl`; add `exports/governance/.gitkeep` if you want the folder tracked before the first MR
 3. Add `lo_quads.db` to `.gitignore` in the LO repo
 4. Bind it from your workspace `.km/config.json` with matching `ontology_id` and a resolvable `source` path
-5. Restart or reconnect the KM MCP — confirm the ontology appears in `get_system_status` and `km://schemas/learning-ontologies`
+5. Restart or reconnect the KM MCP — confirm the ontology appears in `status` and `km://schemas/learning-ontologies`
 
 For MR workflow and promotion from Case facts, see [usages/README.md](../README.md) and spec §4–§6.

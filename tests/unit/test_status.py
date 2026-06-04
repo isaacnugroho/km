@@ -7,7 +7,7 @@ from pathlib import Path
 from km.application.bootstrap import KMApplication
 
 
-def test_get_system_status_fields(tmp_workspace: Path) -> None:
+def test_status_fields(tmp_workspace: Path) -> None:
     app = KMApplication.bootstrap(tmp_workspace)
     try:
         status = app.get_system_status()
@@ -23,11 +23,12 @@ def test_get_system_status_fields(tmp_workspace: Path) -> None:
         assert data["pending_mrs_count"] == 0
         assert data["branch_merge_policy"] == "auto_merge_exception"
         assert data["pending_branch_merges_count"] == 0
+        assert data["pending_branch_merges"] == []
     finally:
         app.shutdown()
 
 
-def test_pending_branch_merges_count(tmp_workspace: Path) -> None:
+def test_pending_branch_merges_in_status(tmp_workspace: Path) -> None:
     app = KMApplication.bootstrap(tmp_workspace)
     try:
         app.merge_prompts.write_prompt(
@@ -44,5 +45,12 @@ def test_pending_branch_merges_count(tmp_workspace: Path) -> None:
         )
         data = app.get_system_status().to_dict()
         assert data["pending_branch_merges_count"] == 1
+        assert len(data["pending_branch_merges"]) == 1
+        entry = data["pending_branch_merges"][0]
+        assert entry["event_id"] == "merge-feature-x-into-main-test"
+        assert entry["source_branch"] == "feature/x"
+        assert entry["approval_command"] == (
+            "resolve_branch_merge merge-feature-x-into-main-test MERGE"
+        )
     finally:
         app.shutdown()

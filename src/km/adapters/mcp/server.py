@@ -99,9 +99,16 @@ def propose_semantic_mr(
 
 
 @mcp.tool()
-def get_system_status() -> str:
-    """Return workspace environment and ontology binding status."""
-    result = _run_tool(lambda: tool_handlers.handle_get_system_status(_get_app()))
+def status() -> str:
+    """Return workspace environment, ontology bindings, and pending branch merges."""
+    result = _run_tool(lambda: tool_handlers.handle_status(_get_app()))
+    return tool_handlers.json_result(result)
+
+
+@mcp.tool()
+def export_case() -> str:
+    """Export the active branch case graph to case-exports/ (same as km export-case)."""
+    result = _run_tool(lambda: tool_handlers.handle_export_case(_get_app()))
     return tool_handlers.json_result(result)
 
 
@@ -113,18 +120,17 @@ def approve_semantic_mr(doc_identifier: str) -> str:
 
 
 @mcp.tool()
-def propose_branch_merge(
+def sync_pending_branch_merges(
     source_branch: str,
     target_branch: str | None = None,
     event_fingerprint: str | None = None,
 ) -> str:
-    """Propose Case Ontology sync after merging a feature branch into main/master.
+    """Idempotently run Case Ontology branch merge policy after a Git merge.
 
-    Use while km mcp is running instead of km merge-resolve (avoids case_quads.db lock).
-    Returns event_id, options, and approval_command when human resolution is required.
+    Returns existing pending prompt, ALREADY_SYNCED, AUTO_MERGED, or PENDING_RESOLUTION.
     """
     result = _run_tool(
-        lambda: tool_handlers.handle_propose_branch_merge(
+        lambda: tool_handlers.handle_sync_pending_branch_merges(
             _get_app(), source_branch, target_branch, event_fingerprint
         )
     )
@@ -135,8 +141,7 @@ def propose_branch_merge(
 def resolve_branch_merge(event_id: str, resolution: str) -> str:
     """Resolve a pending branch merge (MERGE, KEEP_ISOLATED, or DELETE).
 
-    Invoke after the developer approves the command from propose_branch_merge.
-    Do not run km merge-resolve while km mcp is active.
+    Invoke after the developer approves the approval_command from status or sync_pending_branch_merges.
     """
     result = _run_tool(
         lambda: tool_handlers.handle_resolve_branch_merge(_get_app(), event_id, resolution)

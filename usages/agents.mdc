@@ -7,13 +7,36 @@ alwaysApply: true
 
 You manage formal semantics alongside code. Every structural code change must be reflected, verified, and constrained in the semantic layer (Case Ontology RDF graph vs Learning Ontology SHACL shapes).
 
+## KM interface contract (do not infer)
+
+Two surfaces exist. Do not pattern-match CLI names to invent MCP tools or undocumented shell commands.
+
+| Surface                          | Purpose                      | Allowed                                                                                                                                                                                                                                                |
+| :------------------------------- | :--------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **MCP tools** (agent KM work)    | All semantic operations      | `status`, `validate_constraints`, `ingest_case_facts`, `query_semantic_graph`, `propose_local_exception`, `approve_local_exception`, `propose_semantic_mr`, `approve_semantic_mr`, `sync_pending_branch_merges`, `resolve_branch_merge`, `export_case` |
+| **`km` CLI** (shell, human-only) | Bootstrap / inspect / export | `init`, `status`, `mcp`, `export-case` only                                                                                                                                                                                                            |
+
+- Agent KM operations **MUST** use MCP tools — never shell `km …` except when the user explicitly asks (`km init`, or human diagnostics).
+- There is **no** `km validate`. Validation is MCP-only: **`validate_constraints`**.
+- Never call a KM MCP tool from memory. Read its schema descriptor under `mcps/…/tools/<name>.json` before calling.
+- If an MCP tool fails, report the exact error. Do **not** guess CLI fallbacks, alternate tool names, hand-edited TTL, or skipped validation.
+- Do not map MCP `status` → shell `km status` unless the user asks for CLI output.
+- Do not open a second KM process against `.km/case_quads.db` while `km mcp` is running.
+
+## Anti-patterns
+
+- Do not infer undocumented `km` subcommands (e.g. `km validate`, `km merge-resolve`).
+- Do not hand-edit `case-exports/` or `.km/case_quads.db`.
+- Do not treat unit/integration test pass as a substitute for SHACL conformance.
+- Do not rewrite `.km/config.json` to "repair" MCP errors.
+
 ## Protected: `.km/config.json`
 
 **Never** create, edit, delete, or overwrite `.km/config.json` unless the user explicitly asks you to change workspace configuration in this conversation.
 
 - LO bindings, `case_exports`, and `branch_merge` policy are **developer-owned**.
 - Do not rewrite config to add LOs, change `mode`, fix paths, or “repair” MCP errors.
-- Use **`get_system_status`** and **`km://schemas/learning-ontologies`** for bindings — not direct file edits.
+- Use **`status`** and **`km://schemas/learning-ontologies`** for bindings — not direct file edits.
 - If bindings must change, describe the exact JSON diff and let the user edit the file or run `km init` themselves.
 - Do not use the shell (`cp`, `tee`, `jq`, redirects, etc.) to modify this file.
 
@@ -21,7 +44,7 @@ You manage formal semantics alongside code. Every structural code change must be
 
 Before writing code or proposing plans:
 
-1. **`get_system_status`** — active Git branch, `branch_merge_policy`, `pending_branch_merges_count`, loaded LO bindings (ontology_id, source, mode, cache sync).
+1. **`status`** — active Git branch, `branch_merge_policy`, `pending_branch_merges`, loaded LO bindings (ontology_id, source, mode, cache sync).
 2. **`km://schemas/learning-ontologies`** — available classes, properties, constraint boundaries (canonical graphs only).
 3. **`km://case/active-graph`** or **`query_semantic_graph`** — existing branch facts.
 
@@ -42,6 +65,15 @@ Before completing a task:
 1. **`validate_constraints`** against LO **canonical graphs** only (pending MR proposals excluded).
 2. If `conforms: true` — proceed.
 3. If `conforms: false` — analyze `violations` immediately. **Do not ignore validations.**
+
+### MCP tool errors (infrastructure)
+
+If **`validate_constraints`** (or any KM MCP tool) throws or returns a non-result error:
+
+1. Report the exact error message to the developer.
+2. Do not substitute shell commands, hand-edited TTL, or skipped validation.
+3. Optional read-only diagnostics: MCP **`status`**, MCP **`query_semantic_graph`**, or human-run **`km export-case`**.
+4. Known infrastructure issue: if `validate_constraints` fails with `Unknown namespace prefix :`, treat as an MCP/LO prefix-binding bug — not code non-conformance. Report and stop; do not workaround.
 
 ## Tool Patterns
 
@@ -76,13 +108,13 @@ When a local pattern should become global LO policy:
 1. **`propose_semantic_mr`** with `diff_insertions` / `diff_deletions` (target binding needs `mode: "curator"`).
 2. Prompt developer: `approve .km/mrs/mr-{ontology}-{id}.md`
 3. **`approve_semantic_mr`** with `doc_identifier` when developer approves.
-4. **`get_system_status`** — confirm LO cache refreshed.
+4. **`status`** — confirm LO cache refreshed.
 
 ### Branch Case merge (after Git merge into main/master)
 
-When `pending_branch_merges_count > 0` or after merging a feature branch in Git:
+When `pending_branch_merges` is non-empty or after merging a feature branch in Git:
 
-1. **`propose_branch_merge`** (`source_branch`, optional `target_branch`) — do **not** run `km merge-resolve` while `km mcp` is active (DB lock).
-2. Prompt developer with `approval_command` from the response (e.g. `resolve_branch_merge {event_id} MERGE`).
+1. **`status`** — use `pending_branch_merges[].approval_command` when present; else **`sync_pending_branch_merges`** (`source_branch`, optional `target_branch`).
+2. Prompt developer with `approval_command` (e.g. `resolve_branch_merge {event_id} MERGE`).
 3. On approval: **`resolve_branch_merge`** with `event_id` and `MERGE` | `KEEP_ISOLATED` | `DELETE`.
-4. Optional: read `km://case/pending-merges/{event_id}` for full prompt payload.
+4. **`status`** again — `pending_branch_merges_count` should be 0.

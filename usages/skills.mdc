@@ -7,6 +7,12 @@ alwaysApply: true
 
 Reusable recipes for Knowledge Management MCP operations. Execute these during development in KM-governed workspaces.
 
+**MCP tools (agent):** `status`, `validate_constraints`, `ingest_case_facts`, `query_semantic_graph`, `propose_local_exception`, `approve_local_exception`, `propose_semantic_mr`, `approve_semantic_mr`, `sync_pending_branch_merges`, `resolve_branch_merge`, `export_case`.
+
+**CLI (human / no MCP):** `km init`, `km status`, `km mcp`, `km export-case` only. There is no `km validate` — use MCP **`validate_constraints`**.
+
+Never call a KM MCP tool from memory; read `mcps/…/tools/<name>.json` first. On tool failure, report the error — do not invent CLI fallbacks or skip validation.
+
 ## Skill 1: AST-to-RDF Fact Extraction
 
 **When:** After modifying code files (components, endpoints, schemas, application configs). Never edit `.km/config.json` (see agents rule — developer-owned).
@@ -38,6 +44,7 @@ local:useCanvasDrag a react:HighFrequencyEventHook ;
 3. **`conforms: false`** → read `focus_node`, `source_shape`, `message`:
    - Fixable → correct code, re-ingest facts, return to step 1.
    - Not fixable → Skill 3.
+   - Tool error (not `conforms: false`) → report exact message; do not substitute shell `km …`, hand-edited TTL, or test pass for SHACL. Optional diagnostics: MCP **`status`**, MCP **`query_semantic_graph`**, human **`km export-case`**. If error is `Unknown namespace prefix :`, treat as infrastructure bug — report and stop.
 
 ## Skill 3: Local Exception Provisioning
 
@@ -63,14 +70,14 @@ Approved exceptions are branch-scoped; `auto_merge_exception` policy copies them
 3. Review doc materializes at `.km/mrs/mr-{id}.md` — prompt developer:
    `approve .km/mrs/mr-{ontology}-{id}.md`
 4. **`approve_semantic_mr`** with `doc_identifier` when developer approves.
-5. On `APPROVED`: **`get_system_status`** — confirm `.km/lo-cache/` rebuilt and canonical cache reloaded.
+5. On `APPROVED`: **`status`** — confirm `.km/lo-cache/` rebuilt and canonical cache reloaded.
 
 ## Skill 5: Branch Case Merge Resolution
 
 **When:** A feature branch was merged into `main`/`master` in Git and Case facts need §5.3 sync.
 
-1. **`get_system_status`** — check `pending_branch_merges_count` and `branch_merge_policy`.
-2. **`propose_branch_merge`** (`source_branch`, optional `target_branch`) — not `km merge-resolve` while MCP runs.
+1. **`status`** — check `pending_branch_merges` and `branch_merge_policy`.
+2. If no pending entry, **`sync_pending_branch_merges`** (`source_branch`, optional `target_branch`).
 3. If `status` is `PENDING_RESOLUTION`, present `approval_command` to the developer and pause.
 4. **`resolve_branch_merge`** (`event_id`, `resolution`) when the developer approves.
-5. Confirm `pending_branch_merges_count` is 0.
+5. **`status`** — confirm `pending_branch_merges_count` is 0.

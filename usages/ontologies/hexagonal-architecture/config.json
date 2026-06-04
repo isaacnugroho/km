@@ -1,6 +1,7 @@
 {
   "ontology_id": "hexagonal-architecture",
   "base_uri": "http://architecture.org/hexagonal",
+  "prefix": "hex",
   "quad_store": {
     "engine": "sqlite-quad",
     "storage_path": "./lo_quads.db"

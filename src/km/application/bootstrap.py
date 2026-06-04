@@ -18,6 +18,7 @@ from km.application.services.lo_source_store_service import LOSourceStoreService
 from km.application.services.merge_prompt_store import MergePromptStore
 from km.application.services.merge_request_service import MergeRequestService
 from km.application.services.merge_resolver_service import MergeResolverService
+from km.application.services.processed_merge_event_store import ProcessedMergeEventStore
 from km.application.services.mr_review_doc_service import MRReviewDocService
 from km.application.services.query_service import QueryService
 from km.application.services.schema_service import SchemaService
@@ -113,7 +114,10 @@ class KMApplication:
         )
         branch_inheritance = BranchInheritanceService(case_wrapper, case_export)
         merge_prompts = MergePromptStore(root)
-        merge_resolver = MergeResolverService(case_wrapper, case_export, merge_prompts)
+        processed_merges = ProcessedMergeEventStore(root)
+        merge_resolver = MergeResolverService(
+            case_wrapper, case_export, merge_prompts, processed_merges
+        )
         git_watcher = GitWatcherService(
             root,
             workspace.config,

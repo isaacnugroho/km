@@ -63,11 +63,25 @@ class LOPackageNamedGraphs(BaseModel):
     governance: str
 
 
+def default_lo_prefix(ontology_id: str) -> str:
+    """SPARQL/Turtle prefix derived from ontology_id when config.prefix is omitted."""
+    return ontology_id.replace("-", "_")
+
+
 class LOPackageConfig(BaseModel):
     ontology_id: str
     base_uri: str
+    prefix: str | None = None
     quad_store: QuadStoreConfig = Field(default_factory=lambda: QuadStoreConfig(storage_path="./lo_quads.db"))
     named_graphs: LOPackageNamedGraphs
+
+    @property
+    def primary_prefix(self) -> str:
+        return self.prefix if self.prefix else default_lo_prefix(self.ontology_id)
+
+    @property
+    def namespace_uri(self) -> str:
+        return f"{self.base_uri.rstrip('#/')}#"
 
 
 class SyncManifest(BaseModel):

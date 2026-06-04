@@ -5,14 +5,13 @@ from __future__ import annotations
 import pytest
 
 from km.application.services import feature_gate
-from km.application.services import feature_gate
 from km.application.services.feature_gate import require_implemented
 from km.exceptions import FeatureNotImplementedError
 
 
 def test_all_features_enabled() -> None:
     assert all(feature_gate.FEATURES.values())
-    require_implemented("get_system_status")
+    require_implemented("status")
 
 
 def test_phase2_features_implemented() -> None:
@@ -44,7 +43,9 @@ def test_phase4c_mr_approve_implemented() -> None:
 
 
 def test_phase5_features_implemented() -> None:
-    require_implemented("cli:export-case")
+    require_implemented("export_case")
+    require_implemented("sync_pending_branch_merges")
+    require_implemented("resolve_branch_merge")
 
 
 def test_release_enables_feature() -> None:

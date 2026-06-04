@@ -19,8 +19,10 @@ KM_LEARNING_ONTOLOGY = "http://km.local/learning-ontologies/"
 
 
 def lo_prefix_name(ontology_id: str) -> str:
-    """Return the canonical SPARQL prefix label for an LO binding (from ontology_id)."""
-    return ontology_id.replace("-", "_")
+    """Return the default SPARQL prefix label when LO config omits ``prefix``."""
+    from km.infrastructure.config.models import default_lo_prefix
+
+    return default_lo_prefix(ontology_id)
 
 
 def lo_ontology_uri(ontology_id: str) -> str:
@@ -134,9 +136,8 @@ class ShaclCache:
                 canonical_uri = entry.lo_config.named_graphs.canonical
                 quads = wrapper.quads_in_graph(canonical_uri)
                 lo_graph = _quads_to_rdflib(quads)
-                prefix_base = entry.lo_config.base_uri.rstrip("#/")
-                primary_ns = f"{prefix_base}#"
-                primary_prefix = lo_prefix_name(entry.binding.ontology_id)
+                primary_ns = entry.lo_config.namespace_uri
+                primary_prefix = entry.lo_config.primary_prefix
                 lo_prefixes = collect_export_prefixes(entry.source_path)
                 lo_prefixes[primary_prefix] = primary_ns
 

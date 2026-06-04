@@ -152,11 +152,11 @@ The configuration defines workspace identification, **Learning Ontology bindings
 #### Case Export Policy (`case_exports.export_policy`)
 Controls when the daemon writes Git-authoritative Case export files (see §2.6).
 
-| Config value | Behavior                                                                                                                                                                                     |
-| :----------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Config value | Behavior                                                                                                                                                                             |
+| :----------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `on_commit`  | **Default (recommended).** Export active branch graph and pending governance via explicit `km export-case` before commit. Avoids rewriting graph files on every `ingest_case_facts`. |
-| `on_write`   | Upsert `case-exports/graphs/{ref}.ttl` after each mutating Case MCP tool (higher churn; use only for small workspaces).                                                                      |
-| `manual`     | Export only when the developer runs `km export-case`.                                                                                                                                        |
+| `on_write`   | Upsert `case-exports/graphs/{ref}.ttl` after each mutating Case MCP tool (higher churn; use only for small workspaces).                                                              |
+| `manual`     | Export only when the developer runs `km export-case`.                                                                                                                                |
 
 Omitting `case_exports` is equivalent to `"base_path": "./case-exports"` and `"export_policy": "on_commit"`.
 
@@ -244,7 +244,7 @@ If `{source}/exports/governance/` is absent or empty (new LO package), treat gov
 | `km://learning-ontologies/{id}/canonical`              | Cache — canonical                               |                                                               |
 | `km://learning-ontologies/{id}/governance`             | **Source** `{source}/lo_quads.db`               | Curator review; always current, including pending MRs         |
 | `km://mr/{ontology-id}/{mr-id}`                        | **Source** governance + proposal graphs         | Derived MR review document                                    |
-| `pending_mrs_count` (`get_system_status`)              | **Source** governance graph                     | Counts `km:status "PENDING_APPROVAL"` across curator bindings |
+| `pending_mrs_count` (`status`)                         | **Source** governance graph                     | Counts `km:status "PENDING_APPROVAL"` across curator bindings |
 | `propose_semantic_mr` / `approve_semantic_mr` writes   | **Source** `{source}/lo_quads.db`               | Then sync exports and refresh cache (see below)               |
 
 **Cache refresh on MR lifecycle:**
@@ -449,16 +449,16 @@ The KM MCP Server exposes a standard interface enabling reading, writing, valida
 #### Export side effects (Case and LO)
 Mutating tools write to the runtime quad-store first, then update Git-authoritative exports:
 
-| Tool                           | Runtime store          | Export side effect                                                                    |
-| :----------------------------- | :--------------------- | :------------------------------------------------------------------------------------ |
-| `ingest_case_facts`            | `.km/case_quads.db`    | Upsert `case-exports/graphs/{active-ref}.ttl` per `case_exports.export_policy` (§2.6) |
-| `propose_local_exception`      | `.km/case_quads.db`    | Upsert active branch graph file                                                       |
-| `approve_local_exception`      | `.km/case_quads.db`    | Upsert active branch graph file                                                       |
-| Branch merge resolver (daemon) | `.km/case_quads.db`    | Upsert affected graph files; create `case-exports/governance/{event-id}.ttl`          |
-| `propose_branch_merge`         | `.km/case_quads.db`    | May run §5.3 policy steps; writes `.km/pending-merge-{event-id}.json` when prompted   |
-| `resolve_branch_merge`         | `.km/case_quads.db`    | Upsert affected graph files; governance record; remove pending prompt                 |
-| `propose_semantic_mr`          | `{source}/lo_quads.db` | Upsert `{source}/exports/governance/{mr-id}.ttl`                                      |
-| `approve_semantic_mr` / reject | `{source}/lo_quads.db` | Regenerate `{source}/exports/main.ttl`; update MR governance shard                    |
+| Tool                           | Runtime store          | Export side effect                                                                     |
+| :----------------------------- | :--------------------- | :------------------------------------------------------------------------------------- |
+| `ingest_case_facts`            | `.km/case_quads.db`    | Upsert `case-exports/graphs/{active-ref}.ttl` per `case_exports.export_policy` (§2.6)  |
+| `propose_local_exception`      | `.km/case_quads.db`    | Upsert active branch graph file                                                        |
+| `approve_local_exception`      | `.km/case_quads.db`    | Upsert active branch graph file                                                        |
+| Branch merge resolver (daemon) | `.km/case_quads.db`    | Upsert affected graph files; create `case-exports/governance/{event-id}.ttl`           |
+| `sync_pending_branch_merges`   | `.km/case_quads.db`    | Idempotent §5.3 policy steps; writes `.km/pending-merge-{event-id}.json` when prompted |
+| `resolve_branch_merge`         | `.km/case_quads.db`    | Upsert affected graph files; governance record; remove pending prompt                  |
+| `propose_semantic_mr`          | `{source}/lo_quads.db` | Upsert `{source}/exports/governance/{mr-id}.ttl`                                       |
+| `approve_semantic_mr` / reject | `{source}/lo_quads.db` | Regenerate `{source}/exports/main.ttl`; update MR governance shard                     |
 
 Agents MUST NOT hand-edit export files; exports are derived from the store by the daemon.
 
@@ -643,8 +643,8 @@ Canonical MR lifecycle status values: `PENDING_APPROVAL`, `APPROVED`, `REJECTED`
     }
     ```
 
-#### 7. `get_system_status`
-Returns environmental and memory states of the KM daemon.
+#### 7. `status`
+Returns environmental and memory states of the KM daemon. Same JSON as CLI `km status`.
 *   **Parameters Schema:** `(Empty Object)`
 *   **Response Schema:**
     ```json
@@ -669,11 +669,34 @@ Returns environmental and memory states of the KM daemon.
         "pending_exceptions_count": { "type": "integer" },
         "pending_mrs_count": { "type": "integer", "description": "Count of km:status PENDING_APPROVAL in source governance graphs" },
         "branch_merge_policy": { "type": "string", "enum": ["no_auto_merge", "auto_merge", "auto_merge_exception"], "description": "Effective branch_merge.policy from config (default auto_merge_exception)" },
-        "pending_branch_merges_count": { "type": "integer", "description": "Count of pending §5.3 merge prompts in .km/pending-merge-*.json" }
+        "pending_branch_merges_count": { "type": "integer", "description": "Count of pending §5.3 merge prompts" },
+        "pending_branch_merges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "event_id": { "type": "string" },
+              "source_branch": { "type": "string" },
+              "target_branch": { "type": "string" },
+              "policy": { "type": "string" },
+              "exceptions_copied": { "type": "integer" },
+              "remaining_triples": { "type": "integer" },
+              "options": { "type": "array", "items": { "type": "string" } },
+              "warning": { "type": "string" },
+              "approval_command": { "type": "string" }
+            },
+            "required": ["event_id", "source_branch", "target_branch", "policy", "options", "approval_command"]
+          }
+        }
       },
-      "required": ["active_branch", "learning_ontologies", "pending_exceptions_count", "pending_mrs_count", "branch_merge_policy", "pending_branch_merges_count"]
+      "required": ["active_branch", "learning_ontologies", "pending_exceptions_count", "pending_mrs_count", "branch_merge_policy", "pending_branch_merges_count", "pending_branch_merges"]
     }
     ```
+
+#### 7b. `export_case`
+Exports the active branch case graph to `case-exports/`. Same behavior as CLI `km export-case`.
+*   **Parameters Schema:** `(Empty Object)`
+*   **Response Schema:** `{ "status": "success", "export_path": string }`
 
 #### 8. `approve_semantic_mr`
 Records human approval of a pending semantic Merge Request. Requires `mode: "curator"` on the target binding. Merges proposal quads into the **source** LO canonical graph, updates governance triples in the source store, regenerates `{source}/exports/main.ttl`, upserts `{source}/exports/governance/{mr-id}.ttl`, refreshes the workspace cache at `.km/lo-cache/{ontology-id}/`, and reloads the in-memory LO cache. The agent invokes this tool after the developer issues the `approve <doc name>` command in chat.
@@ -704,8 +727,8 @@ Records human approval of a pending semantic Merge Request. Requires `mode: "cur
     }
     ```
 
-#### 9. `propose_branch_merge`
-Initiates or surfaces Case Ontology branch merge resolution per §5.3 and `branch_merge.policy`. Use while `km mcp` is running instead of `km merge-resolve` (parallel CLI processes lock `.km/case_quads.db`).
+#### 9. `sync_pending_branch_merges`
+Idempotently runs or surfaces Case Ontology branch merge resolution per §5.3 and `branch_merge.policy`. Processed event ids are persisted in `.km/processed-merge-events.json`.
 
 *   **Parameters Schema:**
     ```json
@@ -719,8 +742,8 @@ Initiates or surfaces Case Ontology branch merge resolution per §5.3 and `branc
       "required": ["source_branch"]
     }
     ```
-*   **Response Schema:** `{ "event_id", "status": "PENDING_RESOLUTION" | "AUTO_MERGED" | "NO_ACTION", "policy", "source_branch", "target_branch", "exceptions_copied", "remaining_triples", "options", "warning", "approval_command" }`
-*   **Approval command:** `resolve_branch_merge {event_id} MERGE` (or `KEEP_ISOLATED` / `DELETE`). Resource: `km://case/pending-merges/{event_id}`.
+*   **Response Schema:** `{ "event_id", "status": "PENDING_RESOLUTION" | "ALREADY_SYNCED" | "AUTO_MERGED" | "NO_ACTION", "policy", "source_branch", "target_branch", "exceptions_copied", "remaining_triples", "options", "warning", "approval_command" }`
+*   **Approval command:** `resolve_branch_merge {event_id} MERGE` (or `KEEP_ISOLATED` / `DELETE`). Prefer `status.pending_branch_merges` or resource `km://case/pending-merges/{event_id}`.
 
 #### 10. `resolve_branch_merge`
 Applies developer resolution for a pending branch merge prompt. Mutates `.km/case_quads.db` in the MCP process only.

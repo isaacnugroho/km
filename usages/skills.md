@@ -1,6 +1,14 @@
 # Agent Workspace Skills: KM MCP Integration
 
-This document defines reusable, step-by-step workspace recipes ("skills") that agents and developer daemons can execute to automate Knowledge Management operations. 
+This document defines reusable, step-by-step workspace recipes ("skills") that agents and developer daemons can execute to automate Knowledge Management operations.
+
+**MCP tools (agent):** `status`, `validate_constraints`, `ingest_case_facts`, `query_semantic_graph`, `propose_local_exception`, `approve_local_exception`, `propose_semantic_mr`, `approve_semantic_mr`, `sync_pending_branch_merges`, `resolve_branch_merge`, `export_case`.
+
+**CLI (human / no MCP):** `km init`, `km status`, `km mcp`, `km export-case` only. There is **no** `km validate` — use MCP **`validate_constraints`**.
+
+Never edit `.km/config.json` unless the user explicitly requests a config change (see [agents.md](agents.md) §3).
+
+Never call a KM MCP tool from memory; read `mcps/…/tools/<name>.json` first. On tool failure, report the error — do not invent CLI fallbacks or skip validation. See [agents.md](agents.md) §2 for the full interface contract and error-handling policy.
 
 ---
 
@@ -59,7 +67,7 @@ graph TD
 ### Execution Steps
 1.  **Trigger Validation:** Call `validate_constraints` immediately after any local code edit or file generation.
 2.  **Evaluate Results:**
-    *   **Case A: Success (`conforms = true`)** -> Proceed with standard Git staging/commits.
+    *   **Case A: Success (`conforms = true`)** -> Proceed with Git staging/commits; run **Skill 6** if export policy is `on_commit` or `manual`.
     *   **Case B: Failure (`conforms = false`)** -> Halt the pipeline. Read the violation details:
         *   `focus_node`: The node violating constraints.
         *   `source_shape`: The SHACL constraint definition.
@@ -68,6 +76,10 @@ graph TD
     *   Assess if the violation can be fixed by modifying the code.
     *   If yes, execute the correction and return to Step 1.
     *   If no, proceed to **Skill 3: Local Exception Provisioning**.
+4.  **Tool error (infrastructure):** If the call fails (not a `conforms: false` result):
+    *   Report the exact error message — do not substitute shell `km …`, hand-edited TTL, or test pass for SHACL.
+    *   Optional read-only diagnostics: MCP **`status`**, MCP **`query_semantic_graph`**, human **`km export-case`**.
+    *   If error is `Unknown namespace prefix :`, treat as MCP/LO prefix-binding bug — report and stop; do not workaround.
 
 ---
 
@@ -136,7 +148,7 @@ sequenceDiagram
     MCP->>LO: Merge proposal → canonical; regenerate exports/
     MCP->>Cache: Full cache rebuild
     MCP-->>Agent: { status: APPROVED, mr_id, target_ontology, timestamp }
-    Agent->>MCP: get_system_status()
+    Agent->>MCP: status()
 ```
 
 ### Execution Steps
@@ -165,7 +177,7 @@ sequenceDiagram
         {"doc_identifier": ".km/mrs/mr-react-conventions-042.md"},
     )
     ```
-6.  **Reload Memory System:** On `{ "status": "APPROVED" }`, invoke `get_system_status` to confirm the workspace LO cache (`.km/lo-cache/`) is refreshed from source exports and the in-memory canonical cache is reloaded.
+6.  **Reload Memory System:** On `{ "status": "APPROVED" }`, invoke `status` to confirm the workspace LO cache (`.km/lo-cache/`) is refreshed from source exports and the in-memory canonical cache is reloaded.
 
 ---
 
@@ -173,11 +185,47 @@ sequenceDiagram
 
 **Purpose:** Synchronize Case Ontology graphs after Git merges a feature branch into `main`/`master` (spec §5.3).
 
-**When:** `pending_branch_merges_count > 0` in `get_system_status`, or immediately after `git merge` on the target branch.
+**When:** `pending_branch_merges` is non-empty in **`status`**, or immediately after `git merge` on the target branch.
 
-1.  **`propose_branch_merge`** with `source_branch` (and optional `target_branch`). Do **not** shell out to `km merge-resolve` while `km mcp` is running — it locks `.km/case_quads.db`.
-2.  If `status` is `PENDING_RESOLUTION`, show the developer the `approval_command` (e.g. `resolve_branch_merge merge-feature-x-into-main-abc123 MERGE`).
-3.  **Await approval**, then **`resolve_branch_merge`** with the chosen `MERGE`, `KEEP_ISOLATED`, or `DELETE`.
-4.  Re-check **`get_system_status`** — `pending_branch_merges_count` should be 0.
+```mermaid
+sequenceDiagram
+    participant Agent
+    participant MCP as km mcp
+    participant Human as Developer
 
-Optional read: `km://case/pending-merges/{event_id}`.
+    Agent->>MCP: status()
+    alt pending_branch_merges non-empty
+        MCP-->>Agent: pending entries + approval_command
+    else after git merge
+        Agent->>MCP: sync_pending_branch_merges(source_branch, target_branch)
+        MCP-->>Agent: PENDING_RESOLUTION or ALREADY_SYNCED
+    end
+    Agent->>Human: Present approval_command and options
+    Human->>Agent: MERGE / KEEP_ISOLATED / DELETE
+    Agent->>MCP: resolve_branch_merge(event_id, resolution)
+    Agent->>MCP: status()
+    MCP-->>Agent: pending_branch_merges_count = 0
+```
+
+### Execution Steps
+
+1.  **`status`** — read `pending_branch_merges` and `branch_merge_policy`. Each pending entry includes `event_id`, `options`, `warning`, and `approval_command`.
+2.  If the list is empty after a Git merge, call **`sync_pending_branch_merges`** (`source_branch`, optional `target_branch`, optional `event_fingerprint`). Safe to call repeatedly: returns an existing prompt, `ALREADY_SYNCED`, `AUTO_MERGED`, or `NO_ACTION` without rewriting governance (see `.km/processed-merge-events.json`).
+3.  When the response `status` is `PENDING_RESOLUTION`, present `approval_command` to the developer and **pause** (e.g. `resolve_branch_merge merge-feature-x-into-main-abc123 MERGE`).
+4.  **`resolve_branch_merge`** (`event_id`, `resolution`) with `MERGE`, `KEEP_ISOLATED`, or `DELETE`.
+5.  **`status`** — confirm `pending_branch_merges_count` is `0`.
+
+Optional: `km://case/pending-merges/{event_id}` for the raw prompt file.
+
+---
+
+## Skill 6: Case Graph Export (Git commit)
+
+**Purpose:** Write the active branch graph to `case-exports/` when export policy requires an explicit export.
+
+**When:** `case_exports.export_policy` is `on_commit` or `manual` (default is often `on_commit`).
+
+1.  **`export_case`** (MCP) or **`km export-case`** (CLI) — returns `{ "status": "success", "export_path": "..." }`.
+2.  Stage the updated `case-exports/graphs/{active-ref}.ttl` with the code commit.
+
+Do not hand-edit export TTL files.

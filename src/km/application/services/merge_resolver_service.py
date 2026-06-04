@@ -12,6 +12,7 @@ from pyoxigraph import Literal, NamedNode, Quad
 
 from km.application.services.case_export_service import CaseExportService
 from km.application.services.merge_prompt_store import MergePromptStore
+from km.application.services.processed_merge_event_store import ProcessedMergeEventStore
 from km.domain.governance import (
     CASE_GOVERNANCE_GRAPH,
     KM,
@@ -68,6 +69,22 @@ def build_merge_event_id(
     )
 
 
+def pending_branch_merge_summary(prompt: dict[str, Any]) -> dict[str, Any]:
+    """Map a pending-merge prompt JSON object to a status/sync response entry."""
+    event_id = prompt["event_id"]
+    return {
+        "event_id": event_id,
+        "source_branch": prompt["source_branch"],
+        "target_branch": prompt["target_branch"],
+        "policy": prompt["policy"],
+        "exceptions_copied": int(prompt.get("exceptions_copied", 0)),
+        "remaining_triples": int(prompt.get("remaining_triples", 0)),
+        "options": list(prompt["options"]),
+        "warning": prompt.get("warning"),
+        "approval_command": f"resolve_branch_merge {event_id} MERGE",
+    }
+
+
 def resolve_merge_event_fingerprint(
     workspace_root: Path,
     source_branch: str,
@@ -89,17 +106,19 @@ class MergeResolverService:
         case_wrapper: QuadStoreWrapper,
         case_export: CaseExportService,
         prompt_store: MergePromptStore,
+        processed_store: ProcessedMergeEventStore,
         processed_events: set[str] | None = None,
     ) -> None:
         self.case_wrapper = case_wrapper
         self.case_export = case_export
         self.prompt_store = prompt_store
+        self.processed_store = processed_store
         self.processed_events = processed_events if processed_events is not None else set()
 
     def list_pending(self) -> list[dict[str, Any]]:
         return self.prompt_store.list_pending()
 
-    def propose(
+    def sync_pending(
         self,
         source_branch: str,
         target_branch: str,
@@ -114,8 +133,15 @@ class MergeResolverService:
         event_id = build_merge_event_id(source_branch, target_branch, fingerprint)
 
         if self.prompt_store.prompt_path(event_id).is_file():
-            return self._propose_response_from_prompt(
-                self.prompt_store.read_prompt(event_id)
+            return self._sync_response_from_prompt(self.prompt_store.read_prompt(event_id))
+
+        if self.processed_store.contains(event_id):
+            return self._sync_no_action(
+                event_id,
+                policy.value,
+                source_branch,
+                target_branch,
+                status="ALREADY_SYNCED",
             )
 
         result = self.handle_merge(
@@ -126,22 +152,19 @@ class MergeResolverService:
         )
 
         if self.prompt_store.prompt_path(event_id).is_file():
-            return self._propose_response_from_prompt(
-                self.prompt_store.read_prompt(event_id)
-            )
+            return self._sync_response_from_prompt(self.prompt_store.read_prompt(event_id))
 
         if result is None:
-            return self._propose_no_action(
+            return self._sync_no_action(
                 event_id,
                 policy.value,
                 source_branch,
                 target_branch,
+                status="ALREADY_SYNCED",
             )
 
         if result.prompt_written:
-            return self._propose_response_from_prompt(
-                self.prompt_store.read_prompt(event_id)
-            )
+            return self._sync_response_from_prompt(self.prompt_store.read_prompt(event_id))
 
         status = "AUTO_MERGED" if policy == BranchMergePolicy.AUTO_MERGE else "NO_ACTION"
         return {
@@ -166,31 +189,22 @@ class MergeResolverService:
         return self.prompt_store.read_prompt(event_id)
 
     @staticmethod
-    def _propose_response_from_prompt(prompt: dict[str, Any]) -> dict[str, Any]:
-        event_id = prompt["event_id"]
-        return {
-            "event_id": event_id,
-            "status": "PENDING_RESOLUTION",
-            "policy": prompt["policy"],
-            "source_branch": prompt["source_branch"],
-            "target_branch": prompt["target_branch"],
-            "exceptions_copied": int(prompt.get("exceptions_copied", 0)),
-            "remaining_triples": int(prompt.get("remaining_triples", 0)),
-            "options": list(prompt["options"]),
-            "warning": prompt.get("warning"),
-            "approval_command": f"resolve_branch_merge {event_id} MERGE",
-        }
+    def _sync_response_from_prompt(prompt: dict[str, Any]) -> dict[str, Any]:
+        summary = pending_branch_merge_summary(prompt)
+        return {"status": "PENDING_RESOLUTION", **summary}
 
     @staticmethod
-    def _propose_no_action(
+    def _sync_no_action(
         event_id: str,
         policy: str,
         source_branch: str,
         target_branch: str,
+        *,
+        status: str = "NO_ACTION",
     ) -> dict[str, Any]:
         return {
             "event_id": event_id,
-            "status": "NO_ACTION",
+            "status": status,
             "policy": policy,
             "source_branch": source_branch,
             "target_branch": target_branch,
@@ -210,7 +224,9 @@ class MergeResolverService:
         event_fingerprint: str,
     ) -> MergeHandleResult | None:
         event_id = build_merge_event_id(source_branch, target_branch, event_fingerprint)
-        if event_id in self.processed_events:
+        if self.prompt_store.prompt_path(event_id).is_file():
+            return None
+        if event_id in self.processed_events or self.processed_store.contains(event_id):
             return None
 
         source_uri = branch_path_to_graph_uri(source_branch)
@@ -228,7 +244,7 @@ class MergeResolverService:
                 triples_imported=imported,
             )
             self._export_graphs(source_branch, target_branch)
-            self.processed_events.add(event_id)
+            self._mark_processed(event_id)
             return MergeHandleResult(event_id, policy.value, 0, imported, False)
 
         if policy == BranchMergePolicy.AUTO_MERGE_EXCEPTION:
@@ -262,7 +278,7 @@ class MergeResolverService:
                     }
                 )
                 prompt_written = True
-            self.processed_events.add(event_id)
+            self._mark_processed(event_id)
             return MergeHandleResult(
                 event_id,
                 policy.value,
@@ -285,8 +301,12 @@ class MergeResolverService:
                 ),
             }
         )
-        self.processed_events.add(event_id)
+        self._mark_processed(event_id)
         return MergeHandleResult(event_id, policy.value, 0, 0, True)
+
+    def _mark_processed(self, event_id: str) -> None:
+        self.processed_events.add(event_id)
+        self.processed_store.add(event_id)
 
     def resolve_prompt(self, event_id: str, resolution: str) -> dict[str, Any]:
         prompt = self.prompt_store.read_prompt(event_id)

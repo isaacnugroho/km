@@ -56,8 +56,10 @@ def test_cmd_export_case_writes_graph_file(
     assert manifest.is_file()
 
 
-def test_run_cli_merge_resolve_unknown_event(tmp_path: Path, lo_package: Path) -> None:
-    ws = tmp_path / "ws"
-    ws.mkdir()
-    init_workspace(ws, lo_source=str(lo_package))
-    assert run_cli(["merge-resolve", "missing-event", "MERGE"]) == 1
+def test_run_cli_status(tmp_workspace: Path, monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+    monkeypatch.setenv("KM_WORKSPACE_ROOT", str(tmp_workspace))
+    assert run_cli(["status"]) == 0
+    out = capsys.readouterr().out
+    data = json.loads(out)
+    assert data["active_branch"] == "main"
+    assert "pending_branch_merges" in data

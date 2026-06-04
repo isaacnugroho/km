@@ -77,7 +77,7 @@ def test_propose_creates_governance_export_and_review_doc(tmp_curator_workspace:
         assert cache_manifest_after is not None
         assert cache_manifest_after.export_checksums == checksums_before
 
-        status = mcp_tools.handle_get_system_status(app)
+        status = mcp_tools.handle_status(app)
         assert status["pending_mrs_count"] == 1
     finally:
         app.shutdown()
@@ -166,7 +166,7 @@ def test_approve_merges_into_canonical_and_refreshes_cache(tmp_curator_workspace
         assert cache_manifest_after is not None
         assert cache_manifest_after.export_checksums != cache_manifest_before.export_checksums
 
-        status = mcp_tools.handle_get_system_status(app)
+        status = mcp_tools.handle_status(app)
         assert status["pending_mrs_count"] == 0
 
         query_result = mcp_tools.handle_query_semantic_graph(

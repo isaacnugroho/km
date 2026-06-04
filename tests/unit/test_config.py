@@ -9,6 +9,7 @@ import pytest
 
 from km.exceptions import ConfigError, WorkspaceNotFoundError
 from km.infrastructure.config.loader import load_workspace_config, validate_lo_binding
+from km.infrastructure.config.loader import load_lo_package_config
 from km.infrastructure.config.models import AccessMode, LOBinding, WorkspaceConfig
 from km.infrastructure.paths import resolve_path
 from km.application.services.workspace_service import discover_workspace_root
@@ -54,6 +55,39 @@ def test_load_workspace_config(tmp_workspace: Path) -> None:
     cfg = load_workspace_config(tmp_workspace)
     assert cfg.workspace_id == "test-workspace"
     assert len(cfg.learning_ontologies) == 1
+
+
+def test_lo_package_config_prefix(lo_package: Path) -> None:
+    lo_cfg = load_lo_package_config(lo_package)
+    assert lo_cfg.prefix == "hex"
+    assert lo_cfg.primary_prefix == "hex"
+    assert lo_cfg.namespace_uri == "http://architecture.org/hexagonal#"
+
+
+def test_lo_package_config_default_prefix(tmp_path: Path) -> None:
+    lo_root = tmp_path / "sample-lo"
+    lo_root.mkdir()
+    (lo_root / "exports").mkdir()
+    (lo_root / "exports" / "main.ttl").write_text(
+        "@prefix ex: <http://example.org/lo#> .\nex:Thing a <http://www.w3.org/2002/07/owl#Class> .\n",
+        encoding="utf-8",
+    )
+    (lo_root / "config.json").write_text(
+        json.dumps(
+            {
+                "ontology_id": "sample-lo",
+                "base_uri": "http://example.org/lo",
+                "named_graphs": {
+                    "canonical": "http://km.local/learning-ontologies/sample-lo/canonical",
+                    "governance": "http://km.local/learning-ontologies/sample-lo/governance",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    lo_cfg = load_lo_package_config(lo_root)
+    assert lo_cfg.prefix is None
+    assert lo_cfg.primary_prefix == "sample_lo"
 
 
 def test_validate_lo_binding_ok(tmp_workspace: Path, lo_package: Path) -> None:

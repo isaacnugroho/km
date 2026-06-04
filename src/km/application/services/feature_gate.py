@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from km.exceptions import FeatureNotImplementedError
 
-# Phase 5: export-case CLI, git watcher, branch inheritance, merge resolver enabled.
 FEATURES: dict[str, bool] = {
-    "get_system_status": True,
+    "status": True,
+    "export_case": True,
     "ingest_case_facts": True,
     "validate_constraints": True,
     "propose_local_exception": True,
@@ -14,7 +14,7 @@ FEATURES: dict[str, bool] = {
     "query_semantic_graph": True,
     "propose_semantic_mr": True,
     "approve_semantic_mr": True,
-    "propose_branch_merge": True,
+    "sync_pending_branch_merges": True,
     "resolve_branch_merge": True,
     "resource:schemas/learning-ontologies": True,
     "resource:case/active-graph": True,
@@ -23,7 +23,6 @@ FEATURES: dict[str, bool] = {
     "resource:lo/canonical": True,
     "resource:lo/governance": True,
     "resource:mr": True,
-    "cli:export-case": True,
 }
 
 

@@ -83,7 +83,7 @@ def test_pending_merges_resource(tmp_workspace: Path) -> None:
             """,
             "turtle",
         )
-        proposed = mcp_tools.handle_propose_branch_merge(
+        proposed = mcp_tools.handle_sync_pending_branch_merges(
             app, "feature/res", "main", event_fingerprint="res-test"
         )
         event_id = proposed["event_id"]

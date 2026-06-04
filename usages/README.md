@@ -1,6 +1,98 @@
 # KM MCP Usage Walkthrough
 
-This guide walks through a complete **agent + developer** session using the Knowledge Management MCP tools end to end. For operational detail, see [agents.md](agents.md) (lifecycle and patterns) and [skills.md](skills.md) (reusable recipes).
+This guide walks through a complete **agent + developer** session using the Knowledge Management MCP tools end to end. It also serves as the **authoritative agent interface reference** for KM-governed workspaces.
+
+For deeper operational detail, see [agents.md](agents.md) (lifecycle and patterns) and [skills.md](skills.md) (reusable recipes). Cursor always-applied rules: [agents.mdc](agents.mdc), [skills.mdc](skills.mdc).
+
+---
+
+## Agent interface contract
+
+Two surfaces exist — do not conflate them or infer undocumented CLI commands.
+
+| Surface                             | Who uses it                              | Purpose                                    |
+| :---------------------------------- | :--------------------------------------- | :----------------------------------------- |
+| **MCP tools** (`km mcp` via Cursor) | Agent                                    | All semantic operations during development |
+| **`km` CLI** (shell)                | Developer (or agent only when user asks) | Bootstrap, inspect, export                 |
+
+There is **no** `km validate` CLI command. SHACL validation is **MCP-only** via `validate_constraints`.
+
+### CLI subcommands (shell)
+
+| Command          | Purpose                                             |
+| :--------------- | :-------------------------------------------------- |
+| `km init`        | Initialize `.km/` workspace configuration           |
+| `km status`      | Print system status JSON (developer inspection)     |
+| `km mcp`         | Start MCP server (configured in `.cursor/mcp.json`) |
+| `km export-case` | Export active branch case graph to `case-exports/`  |
+
+Agent default: **do not run shell `km`** except when the user explicitly requests `km init` or another CLI command. Never call a KM MCP tool from memory — read its schema under the MCP descriptor folder first. If an MCP tool fails, report the exact error; do **not** substitute CLI commands, hand-edited TTL, or skipped validation.
+
+Avoid opening a second KM process against `.km/case_quads.db` while `km mcp` is running.
+
+### MCP tools (agent operations)
+
+| MCP tool                     | When to use                                                                |
+| :--------------------------- | :------------------------------------------------------------------------- |
+| `status`                     | Task start; check branch, LO bindings, pending merges/exceptions/MRs       |
+| `validate_constraints`       | After code/fact changes; SHACL lint against LO canonical graphs            |
+| `ingest_case_facts`          | After structural code changes; write Turtle/JSON-LD to active branch graph |
+| `query_semantic_graph`       | Read-only SPARQL over case + LO graphs                                     |
+| `propose_local_exception`    | SHACL violation cannot be fixed without unacceptable harm                  |
+| `approve_local_exception`    | After developer approves exception (requires signature)                    |
+| `propose_semantic_mr`        | Promote local pattern to shared LO (curator mode binding)                  |
+| `approve_semantic_mr`        | After developer approves MR doc                                            |
+| `sync_pending_branch_merges` | After Git merge when no pending entry in `status` yet                      |
+| `resolve_branch_merge`       | After developer approves `approval_command` from `status`                  |
+| `export_case`                | Export active branch graph (MCP equivalent of `km export-case`)            |
+
+### MCP resources
+
+| URI                                        | Purpose                                       |
+| :----------------------------------------- | :-------------------------------------------- |
+| `km://schemas/learning-ontologies`         | Allowed classes, properties, SHACL boundaries |
+| `km://case/active-graph`                   | Active branch case facts                      |
+| `km://case/active-exceptions`              | Approved/pending local exceptions             |
+| `km://case/pending-merges`                 | Pending branch merge events                   |
+| `km://case/pending-merges/{event_id}`      | Raw prompt JSON for one merge event           |
+| `km://learning-ontologies/{id}/canonical`  | One LO canonical export                       |
+| `km://learning-ontologies/{id}/governance` | MR governance (source store)                  |
+| `km://mr/{ontology-id}/{mr-id}`            | Derived MR review document                    |
+
+### Workflow summary
+
+**Start of task:** MCP `status` → `km://schemas/learning-ontologies` → `km://case/active-graph` or `query_semantic_graph`
+
+**After code changes:** extract semantics → `ingest_case_facts` (confirm `triples_added > 0`) → `validate_constraints`
+
+**SHACL outcomes:**
+
+| Result                           | Action                                                                                           |
+| :------------------------------- | :----------------------------------------------------------------------------------------------- |
+| `conforms: true`                 | Proceed                                                                                          |
+| `conforms: false`                | Read `focus_node`, `source_shape`, `message`; fix code + re-ingest, or `propose_local_exception` |
+| Tool error (throws / non-result) | Report exact error; **do not** substitute CLI, skip validation, or treat tests as SHACL pass     |
+
+**After Git merge into main/master:**
+
+1. MCP `status` → check `pending_branch_merges`
+2. If empty, **`sync_pending_branch_merges`** (`source_branch`, optional `target_branch`)
+3. Present `approval_command` to developer; pause
+4. **`resolve_branch_merge`** with `MERGE` \| `KEEP_ISOLATED` \| `DELETE`
+5. MCP `status` → `pending_branch_merges_count` should be 0
+
+### Protected paths
+
+| Path                            | Rule                                                    |
+| :------------------------------ | :------------------------------------------------------ |
+| `.km/config.json`               | Developer-owned; never edit unless user explicitly asks |
+| `.km/case_quads.db`             | Written by MCP ingest/merge — not hand-edited           |
+| `case-exports/graphs/*.ttl`     | Generated by export policy — not hand-edited            |
+| `case-exports/governance/*.ttl` | Generated by merge resolution — not hand-edited         |
+
+### Known infrastructure issues
+
+If `validate_constraints` fails with **`Unknown namespace prefix :`**, treat as an MCP/LO prefix-binding bug in the validator — not as case-graph non-conformance. Report the error and stop; do not invent CLI workarounds.
 
 ---
 
@@ -23,6 +115,8 @@ my-app/
 └── src/
 ```
 
+MCP server entry: `.cursor/mcp.json` → `km mcp` with `cwd` = workspace root.
+
 Example `.km/config.json`:
 
 ```json
@@ -44,6 +138,8 @@ Example `.km/config.json`:
   "branch_merge": { "policy": "auto_merge_exception" }
 }
 ```
+
+LO bindings, export policy, and branch merge policy live in `.km/config.json` (developer-owned).
 
 `case_exports.export_policy` controls when Case Turtle files are written (default `on_commit` — see spec §2.6). Commit `case-exports/` with application changes for audit and review.
 
@@ -71,11 +167,11 @@ You add a React hook `useCanvasDrag.ts` that emits high-frequency pointer events
 
 ### Step 0 — Orient the session
 
-**Tool:** `get_system_status`  
+**Tool:** `status`  
 **Resource:** `km://schemas/learning-ontologies`
 
 ```text
-get_system_status()
+status()
 → {
     "active_branch": "feature/collaborative-canvas",
     "learning_ontologies": [
@@ -160,6 +256,8 @@ If `conforms` is `false`, inspect each violation:
 **Branch A — Fix the code:** Adjust implementation, re-ingest facts, call `validate_constraints` again.
 
 **Branch B — Request an exception:** Continue to Step 3.
+
+If the tool itself errors (not a `conforms: false` result), report the exact message — do not substitute shell `km …`, hand-edited TTL, or test pass for SHACL. See **Known infrastructure issues** above.
 
 ---
 
@@ -253,7 +351,7 @@ approve_semantic_mr({
 
 On approval the server merges into the source canonical graph, regenerates `exports/main.ttl`, updates `exports/governance/{mr-id}.ttl`, and **fully rebuilds** `.km/lo-cache/`.
 
-**Tool:** `get_system_status` — confirm cache sync and updated bindings.
+**Tool:** `status` — confirm cache sync and updated bindings.
 
 **Resources for review:**
 
@@ -262,28 +360,33 @@ On approval the server merges into the source canonical graph, regenerates `expo
 
 ---
 
-## Tool reference (quick)
+### Step 5 — Branch case merge (after Git merge)
 
-| Order | Tool                               | When to use                                                              |
-| :---- | :--------------------------------- | :----------------------------------------------------------------------- |
-| 1     | `get_system_status`                | Session start; after MR approval                                         |
-| —     | `km://schemas/learning-ontologies` | Before ingesting facts                                                   |
-| 2     | `ingest_case_facts`                | After code/design changes; commit `case-exports/` when using `on_commit` |
-| 3     | `query_semantic_graph`             | Inspect case + LO canonical state                                        |
-| 4     | `validate_constraints`             | Before finishing a task                                                  |
-| 5     | `propose_local_exception`          | Legitimate shape bypass needed                                           |
-| 6     | `approve_local_exception`          | After developer approves exception                                       |
-| 7     | `propose_semantic_mr`              | Promote pattern to LO (curator)                                          |
-| 8     | `approve_semantic_mr`              | After developer approves MR                                              |
+After merging a feature branch into `main` or `master`, synchronize Case Ontology graphs per `branch_merge.policy` (spec §5.3). The git watcher inside `km mcp` may run policy steps automatically; you still complete human resolution via MCP.
 
-| Resource                                   | Purpose                                                               |
-| :----------------------------------------- | :-------------------------------------------------------------------- |
-| `km://schemas/learning-ontologies`         | LO classes, properties, shapes (cache canonical)                      |
-| `km://case/active-graph`                   | Current branch case facts (runtime); Git diff: `case-exports/graphs/` |
-| `km://case/active-exceptions`              | Pending and approved exceptions                                       |
-| `km://learning-ontologies/{id}/canonical`  | One LO canonical export                                               |
-| `km://learning-ontologies/{id}/governance` | MR governance (source store)                                          |
-| `km://mr/{ontology-id}/{mr-id}`            | Derived MR review document                                            |
+**Tools:** `status`, `sync_pending_branch_merges`, `resolve_branch_merge`
+
+```text
+status()
+→ { "pending_branch_merges": [ { "event_id": "...", "approval_command": "resolve_branch_merge ... MERGE" } ] }
+```
+
+If `pending_branch_merges` is empty:
+
+```text
+sync_pending_branch_merges({ "source_branch": "feature/collaborative-canvas" })
+→ { "status": "PENDING_RESOLUTION", "approval_command": "..." }
+```
+
+Present `approval_command` to the developer and pause. On approval:
+
+```text
+resolve_branch_merge({ "event_id": "merge-feature-x-into-main-abc123", "resolution": "MERGE" })
+```
+
+Re-run `status` — `pending_branch_merges_count` should be `0`.
+
+Optional: `km://case/pending-merges/{event_id}` for the raw prompt JSON.
 
 ---
 
@@ -291,7 +394,7 @@ On approval the server merges into the source canonical graph, regenerates `expo
 
 ```mermaid
 graph TD
-    Start([Task start]) --> Status[get_system_status + schemas]
+    Start([Task start]) --> Status[status + schemas]
     Status --> Code[Modify code]
     Code --> Ingest[ingest_case_facts]
     Ingest --> Validate[validate_constraints]
@@ -302,6 +405,9 @@ graph TD
     Exception --> Validate
     Validate -->|pattern is global| MR[propose_semantic_mr → human approve → approve_semantic_mr]
     MR --> Status
+    GitMerge[Git merge to main] --> MergeSync[status / sync_pending_branch_merges]
+    MergeSync --> MergeResolve[resolve_branch_merge]
+    MergeResolve --> Status
 ```
 
 ---
@@ -312,6 +418,7 @@ graph TD
 | :--------------------------------------------------------------------------------------------- | :---------------------------------------------------------------- |
 | [agents.md](agents.md)                                                                         | Agent lifecycle, tool patterns, MR lifecycle                      |
 | [skills.md](skills.md)                                                                         | Step-by-step skills: ingestion, linting, exceptions, MR promotion |
+| [agents.mdc](agents.mdc) / [skills.mdc](skills.mdc)                                            | Always-applied Cursor rules                                       |
 | [../docs/brief.md](../docs/brief.md)                                                           | System overview and MCP interface summary                         |
 | [../docs/knowledge-management-specification.md](../docs/knowledge-management-specification.md) | Full engineering specification                                    |
 | [../docs/simulations/app-feature-simulation.md](../docs/simulations/app-feature-simulation.md) | Multi-ontology feature walkthrough                                |

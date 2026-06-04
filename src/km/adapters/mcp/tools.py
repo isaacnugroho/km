@@ -14,10 +14,16 @@ from km.logging_config import get_logger
 logger = get_logger("mcp.tools")
 
 
-def handle_get_system_status(app: KMApplication) -> dict[str, Any]:
-    require_implemented("get_system_status")
+def handle_status(app: KMApplication) -> dict[str, Any]:
+    require_implemented("status")
     status = app.get_system_status()
     return status.to_dict()
+
+
+def handle_export_case(app: KMApplication) -> dict[str, Any]:
+    require_implemented("export_case")
+    export_path = app.case_export.export_active(app.git_context)
+    return {"status": "success", "export_path": str(export_path)}
 
 
 def handle_ingest_case_facts(app: KMApplication, facts: str, format: str = "json-ld") -> dict[str, Any]:
@@ -76,15 +82,15 @@ def handle_approve_semantic_mr(app: KMApplication, doc_identifier: str) -> dict[
     return result
 
 
-def handle_propose_branch_merge(
+def handle_sync_pending_branch_merges(
     app: KMApplication,
     source_branch: str,
     target_branch: str | None = None,
     event_fingerprint: str | None = None,
 ) -> dict[str, Any]:
-    require_implemented("propose_branch_merge")
+    require_implemented("sync_pending_branch_merges")
     target = target_branch or default_target_branch(app.workspace_root)
-    return app.merge_resolver.propose(
+    return app.merge_resolver.sync_pending(
         source_branch,
         target,
         app.workspace.config.branch_merge.policy,

@@ -171,7 +171,7 @@ def test_pending_exceptions_count(tmp_workspace: Path) -> None:
             f"{CASE}api",
             "Pending",
         )
-        status = mcp_tools.handle_get_system_status(app)
+        status = mcp_tools.handle_status(app)
         assert status["pending_exceptions_count"] == 1
     finally:
         app.shutdown()
@@ -184,6 +184,8 @@ def test_schemas_resource_lists_hex_classes(tmp_workspace: Path) -> None:
         assert mime == "application/ld+json"
         doc = json.loads(content)
         lo = doc["learning_ontologies"][0]
+        assert lo["prefix"] == "hex"
+        assert lo["namespace_uri"] == HEX
         class_uris = {c["uri"] for c in lo["classes"]}
         assert f"{HEX}ApplicationCore" in class_uris
         assert f"{HEX}DrivingAdapter" in class_uris

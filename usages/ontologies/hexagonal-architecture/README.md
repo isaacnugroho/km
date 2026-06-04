@@ -14,7 +14,7 @@
 ```
 hexagonal-architecture/
 ├── README.md              # This file
-├── config.json            # LO package config (ontology_id, named graphs)
+├── config.json            # LO package config (ontology_id, prefix, named graphs)
 ├── lo_quads.db            # Runtime quad-store (Git ignored)
 └── exports/
     ├── main.ttl           # Canonical vocabulary + SHACL shapes (Git authority)

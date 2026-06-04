@@ -12,6 +12,53 @@ As an agent operating in this workspace, you do not just write code; you manage 
 
 Every structural change you make to the symbolic layer must be reflected, verified, and constrained in the semantic layer.
 
+---
+
+## 2. KM Interface Contract (Do Not Infer)
+
+Two surfaces exist. Do not pattern-match CLI names to invent MCP tools or undocumented shell commands.
+
+| Surface                          | Purpose                      | Allowed                                                                                                                                                                                                                                                |
+| :------------------------------- | :--------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **MCP tools** (agent KM work)    | All semantic operations      | `status`, `validate_constraints`, `ingest_case_facts`, `query_semantic_graph`, `propose_local_exception`, `approve_local_exception`, `propose_semantic_mr`, `approve_semantic_mr`, `sync_pending_branch_merges`, `resolve_branch_merge`, `export_case` |
+| **`km` CLI** (shell, human-only) | Bootstrap / inspect / export | `init`, `status`, `mcp`, `export-case` only                                                                                                                                                                                                            |
+
+**Rules:**
+
+- Agent KM operations **MUST** use MCP tools — never shell `km …` except when the user explicitly asks (`km init`, or human diagnostics).
+- There is **no** `km validate`. Validation is MCP-only: **`validate_constraints`**.
+- Never call a KM MCP tool from memory. Read its schema descriptor under `mcps/…/tools/<name>.json` before calling.
+- If an MCP tool fails, report the exact error. Do **not** guess CLI fallbacks, alternate tool names, hand-edited TTL, or skipped validation.
+- Do not map MCP `status` → shell `km status` unless the user asks for CLI output.
+- Do not open a second KM process against `.km/case_quads.db` while `km mcp` is running.
+
+### Anti-patterns
+
+- Do not infer undocumented `km` subcommands (e.g. `km validate`, `km merge-resolve`).
+- Do not hand-edit `case-exports/` or `.km/case_quads.db`.
+- Do not treat unit/integration test pass as a substitute for SHACL conformance.
+- Do not rewrite `.km/config.json` to "repair" MCP errors.
+
+### MCP tool errors (infrastructure)
+
+If **`validate_constraints`** (or any KM MCP tool) throws or returns a non-result error:
+
+1. Report the exact error message to the developer.
+2. Do not substitute shell commands, hand-edited TTL, or skipped validation.
+3. Optional read-only diagnostics: MCP **`status`**, MCP **`query_semantic_graph`**, or human-run **`km export-case`**.
+4. Known infrastructure issue: if `validate_constraints` fails with `Unknown namespace prefix :`, treat as an MCP/LO prefix-binding bug — not code non-conformance. Report and stop; do not workaround.
+
+---
+
+## 3. Protected Workspace Configuration
+
+**Never** create, edit, delete, or overwrite `.km/config.json` unless the user explicitly asks you to change workspace configuration.
+
+- LO bindings, `case_exports`, and `branch_merge` policy are **developer-owned**.
+- Use **`status`** and **`km://schemas/learning-ontologies`** for bindings — not direct file edits.
+- If bindings must change, describe the exact JSON diff and let the user edit the file or run `km init` themselves.
+- Do not use the shell (`cp`, `tee`, `jq`, redirects, etc.) to modify this file.
+
 ```mermaid
 graph LR
     Agent[LLM Agent] -->|1. Modifies Code| Code[(Symbolic Codebase)]
@@ -27,15 +74,15 @@ graph LR
 
 ---
 
-## 2. Agent Execution Lifecycle Integration
+## 4. Agent Execution Lifecycle Integration
 
 You MUST integrate KM MCP tool operations into your standard execution loop at specific checkpoints.
 
 ### Phase 1: Context Ingestion & Alignment (On Startup / Task Start)
 Before writing any code or proposing plans, align your context window with the workspace's loaded ontologies:
-1.  **Retrieve System Status:** Invoke `get_system_status` to determine the active Git branch, the effective `branch_merge_policy`, `pending_branch_merges_count`, and the loaded Learning Ontology bindings (ontology_id, source, mode, cache sync state).
-2.  **Inspect Active Schemas:** Read the schema resource at `km://schemas/learning-ontologies` to understand available classes, properties, and constraint boundaries (sourced from cached LO **canonical graphs** only).
-3.  **Read Case Triples:** Load `km://case/active-graph` or execute targeted SPARQL read queries (`query_semantic_graph`) to understand what structural facts have already been established for this branch.
+1.  **`status`** — active Git branch, `branch_merge_policy`, `pending_branch_merges` (full entries with `approval_command`), `pending_branch_merges_count`, and loaded Learning Ontology bindings (ontology_id, source, mode, cache sync state). Same JSON as CLI `km status`.
+2.  **Inspect Active Schemas:** Read `km://schemas/learning-ontologies` for available classes, properties, and constraint boundaries (cached LO **canonical graphs** only).
+3.  **Read Case Triples:** Load `km://case/active-graph` or run targeted SPARQL via `query_semantic_graph` for existing branch facts.
 
 ### Phase 2: Fact Discovery & Ingestion (During Development)
 As you write code (e.g., creating components, modules, endpoints, or data models), you must discover and register the facts:
@@ -53,11 +100,31 @@ Before completing a task or presenting a completed change to the developer, veri
     *   If `conforms` is `true`, proceed with confidence.
     *   If `conforms` is `false`, analyze the `violations` array immediately. **DO NOT ignore validations.**
 
+See **§2 MCP tool errors (infrastructure)** when the tool itself fails (not a `conforms: false` result).
+
 ---
 
-## 3. Detailed Tool Usage Patterns
+## 5. Detailed Tool Usage Patterns
 
-### 3.1 Dynamic Fact Ingestion (`ingest_case_facts`)
+### MCP / CLI surface alignment
+
+| Capability                     | CLI              | MCP tool                                             |
+| :----------------------------- | :--------------- | :--------------------------------------------------- |
+| Workspace status               | `km status`      | `status`                                             |
+| SHACL validation               | —                | `validate_constraints`                               |
+| Fact ingestion                 | —                | `ingest_case_facts`                                  |
+| SPARQL query                   | —                | `query_semantic_graph`                               |
+| Local exceptions               | —                | `propose_local_exception`, `approve_local_exception` |
+| Semantic MR                    | —                | `propose_semantic_mr`, `approve_semantic_mr`         |
+| Export active branch graph     | `km export-case` | `export_case`                                        |
+| Branch merge sync (idempotent) | —                | `sync_pending_branch_merges`                         |
+| Branch merge resolve           | —                | `resolve_branch_merge`                               |
+
+MCP-only capabilities have **no** CLI mirror. Do not invent one.
+
+Avoid opening a second KM process against `.km/case_quads.db` while `km mcp` is running.
+
+### 5.1 Dynamic Fact Ingestion (`ingest_case_facts`)
 When registering code features, express them using clean Turtle or JSON-LD syntax mapped to the schemas defined in your active Learning Ontologies.
 
 #### Python Example: Ingesting an API Controller Structure
@@ -81,11 +148,11 @@ mcp_client.call_tool(
 )
 ```
 
-Facts are written to `.km/case_quads.db` first. The daemon updates `case-exports/graphs/{active-ref}.ttl` per `case_exports.export_policy` (default: on git commit or `km export-case`). **Do not** hand-edit export files.
+Facts are written to `.km/case_quads.db` first. Exports land in `case-exports/graphs/{active-ref}.ttl` per `case_exports.export_policy` (default: before commit). Use MCP **`export_case`** or CLI **`km export-case`** when policy is `on_commit` or `manual`. **Do not** hand-edit export files.
 
 ---
 
-### 3.2 Executing Targeted SPARQL Queries (`query_semantic_graph`)
+### 5.2 Executing Targeted SPARQL Queries (`query_semantic_graph`)
 Use compact SPARQL queries to locate patterns or find relationships instead of searching the directory recursively or parsing files manually.
 
 #### Ask: Find all REST Controllers that depend on Unsecured Services
@@ -105,7 +172,7 @@ WHERE {
 
 ---
 
-### 3.3 Navigating Violations & Proposing Exceptions
+### 5.3 Navigating Violations & Proposing Exceptions
 
 When `validate_constraints` flags a violation (e.g., an API route has an execution timeout that exceeds maximum global bounds), you have two choices:
 1.  **Refactor the Code:** Adjust the symbolic implementation to conform to the shape.
@@ -145,7 +212,7 @@ mcp_client.call_tool(
 
 ---
 
-## 4. Semantic MR Life Cycle (Knowledge Promotion)
+## 6. Semantic MR Life Cycle (Knowledge Promotion)
 
 When a local pattern or structural extension proves to be globally useful, promote it to a static **Learning Ontology** via the semantic Merge Request pipeline:
 
@@ -160,18 +227,20 @@ When a local pattern or structural extension proves to be globally useful, promo
         {"doc_identifier": ".km/mrs/mr-react-conventions-042.md"},
     )
     ```
-6.  **Re-align:** On `{ "status": "APPROVED" }`, invoke `get_system_status` to confirm the workspace LO cache is refreshed and the canonical graph cache is synchronized.
+6.  **Re-align:** On `{ "status": "APPROVED" }`, invoke `status` to confirm the workspace LO cache is refreshed and the canonical graph cache is synchronized.
 
 ---
 
-## 5. Branch Case Merge Resolution (Post-Git Merge)
+## 7. Branch Case Merge Resolution (Post-Git Merge)
 
-After merging a feature branch into `main` or `master`, synchronize Case Ontology graphs per `branch_merge.policy` (§5.3):
+After merging a feature branch into `main` or `master`, synchronize Case Ontology graphs per `branch_merge.policy` (spec §5.3). The git watcher inside `km mcp` may run policy steps automatically; you still complete human resolution via MCP.
 
-1.  **`propose_branch_merge`** (`source_branch`, optional `target_branch`) — runs policy steps and returns `approval_command` when human input is required.
-2.  **Do not** run `km merge-resolve` while `km mcp` is active; a second process cannot open `.km/case_quads.db`.
-3.  Prompt the developer with the returned command, e.g. `resolve_branch_merge merge-feature-x-into-main-abc123 MERGE`.
-4.  On approval, invoke **`resolve_branch_merge`** with `event_id` and `MERGE`, `KEEP_ISOLATED`, or `DELETE`.
-5.  Confirm `pending_branch_merges_count` is 0 via `get_system_status`.
+**When:** `pending_branch_merges` is non-empty in **`status`**, or immediately after `git merge` on the target branch.
 
-Read `km://case/pending-merges` or `km://case/pending-merges/{event_id}` for pending prompt payloads.
+1.  **`status`** — if `pending_branch_merges` has entries, use each `approval_command`, `options`, and `warning` directly.
+2.  Else **`sync_pending_branch_merges`** (`source_branch`, optional `target_branch`, optional `event_fingerprint`). Idempotent: returns existing prompt, `PENDING_RESOLUTION`, `ALREADY_SYNCED`, `AUTO_MERGED`, or `NO_ACTION` without duplicating governance writes (processed events persist in `.km/processed-merge-events.json`).
+3.  If the sync response `status` is `PENDING_RESOLUTION`, prompt the developer with `approval_command` (default suggests `MERGE`; choices: `MERGE`, `KEEP_ISOLATED`, `DELETE`).
+4.  On approval, **`resolve_branch_merge`** (`event_id`, `resolution`).
+5.  **`status`** again — `pending_branch_merges_count` should be `0`.
+
+Optional: `km://case/pending-merges/{event_id}` for the raw prompt JSON.

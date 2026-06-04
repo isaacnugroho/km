@@ -6,13 +6,13 @@ See [docs/knowledge-management-specification.md](docs/knowledge-management-speci
 
 ## Roadmap status
 
-| Phase | Focus                                                     | Status   |
-| :---- | :-------------------------------------------------------- | :------- |
-| 1     | Bootstrap, LO cache, `get_system_status`, MCP/CLI surface | Complete |
-| 2     | Case ingest, SPARQL query, case export pipeline           | Complete |
-| 3     | SHACL validation, local exceptions, schema resources      | Complete |
-| 4     | Semantic merge requests, LO governance resources          | Complete |
-| 5     | Git branch sync, merge policies, `export-case` CLI        | Complete |
+| Phase | Focus                                                | Status   |
+| :---- | :--------------------------------------------------- | :------- |
+| 1     | Bootstrap, LO cache, `status`, MCP/CLI surface       | Complete |
+| 2     | Case ingest, SPARQL query, case export pipeline      | Complete |
+| 3     | SHACL validation, local exceptions, schema resources | Complete |
+| 4     | Semantic merge requests, LO governance resources     | Complete |
+| 5     | Git branch sync, merge policies, `export-case` CLI   | Complete |
 
 ## Phase 1 status
 
@@ -35,7 +35,7 @@ Phase 3 adds constraint enforcement and exception workflow:
 - `propose_local_exception` / `approve_local_exception` — human-in-the-loop bypass
 - `km://schemas/learning-ontologies` — JSON-LD schema bundle for bound LOs
 - `km://case/active-exceptions` — pending and approved exceptions on active branch
-- Real `pending_exceptions_count` in `get_system_status`
+- Real `pending_exceptions_count` in `status`
 
 ## Phase 4 status
 
@@ -45,7 +45,7 @@ Phase 4 adds semantic merge request governance:
 - `km://learning-ontologies/{id}/canonical` — canonical graph from workspace cache
 - `km://learning-ontologies/{id}/governance` — MR records from source LO store
 - `km://mr/{ontology-id}/{mr-id}` — derived review markdown (`.km/mrs/`)
-- Real `pending_mrs_count` in `get_system_status`; LO cache + SHACL refresh on MR approve
+- Real `pending_mrs_count` in `status`; LO cache + SHACL refresh on MR approve
 
 ## Phase 5 status
 
@@ -54,9 +54,10 @@ Phase 5 adds Git-aligned case lifecycle:
 - Git ref watcher (MCP daemon) — branch switch detection, context swap, inheritance
 - Branch inheritance — clone-on-write from parent when a new branch graph is empty
 - Merge resolver — `auto_merge`, `auto_merge_exception` (default), `no_auto_merge` policies
-- `propose_branch_merge` / `resolve_branch_merge` MCP tools — resolve pending merges while `km mcp` is running
-- `km merge-resolve` — headless/CI only when MCP is stopped (parallel CLI locks `case_quads.db`)
-- `km export-case` — export active branch graph + manifest
+- `sync_pending_branch_merges` / `resolve_branch_merge` MCP tools — idempotent §5.3 sync while `km mcp` runs
+- Persisted processed merge events (`.km/processed-merge-events.json`)
+- `km status` / MCP `status` — includes full `pending_branch_merges` payloads
+- `km export-case` / MCP `export_case` — export active branch graph + manifest
 
 ## Install
 
@@ -158,27 +159,27 @@ pytest
 
 ## MCP tools
 
-| Tool                      | Status                        |
-| :------------------------ | :---------------------------- |
-| `get_system_status`       | Implemented                   |
-| `ingest_case_facts`       | Implemented                   |
-| `query_semantic_graph`    | Implemented                   |
-| `validate_constraints`    | Implemented                   |
-| `propose_local_exception` | Implemented                   |
-| `approve_local_exception` | Implemented                   |
-| `propose_semantic_mr`     | Implemented (curator binding) |
-| `approve_semantic_mr`     | Implemented (curator binding) |
-| `propose_branch_merge`    | Implemented                   |
-| `resolve_branch_merge`    | Implemented                   |
+| Tool                         | Status                                    |
+| :--------------------------- | :---------------------------------------- |
+| `status`                     | Implemented (same payload as `km status`) |
+| `export_case`                | Implemented (same as `km export-case`)    |
+| `ingest_case_facts`          | Implemented                               |
+| `query_semantic_graph`       | Implemented                               |
+| `validate_constraints`       | Implemented                               |
+| `propose_local_exception`    | Implemented                               |
+| `approve_local_exception`    | Implemented                               |
+| `propose_semantic_mr`        | Implemented (curator binding)             |
+| `approve_semantic_mr`        | Implemented (curator binding)             |
+| `sync_pending_branch_merges` | Implemented                               |
+| `resolve_branch_merge`       | Implemented                               |
 
 Resources: eight MCP resources are implemented (`km://schemas/learning-ontologies`, `km://case/active-graph`, `km://case/active-exceptions`, `km://case/pending-merges`, `km://learning-ontologies/{id}/canonical`, `km://learning-ontologies/{id}/governance`, `km://mr/{ontology-id}/{mr-id}`).
 
 ## CLI commands
 
-| Command                               | Description                                                                                |
-| :------------------------------------ | :----------------------------------------------------------------------------------------- |
-| `km init [--path DIR]`                | Create `.km/config.json` and case-exports dirs                                             |
-| `km status`                           | Print system status JSON                                                                   |
-| `km mcp`                              | Start MCP stdio server (enables git watcher)                                               |
-| `km export-case`                      | Export active branch graph to `case-exports/`                                              |
-| `km merge-resolve EVENT RESOLUTION`   | Resolve pending merge when MCP is **not** running (same choices as `resolve_branch_merge`) |
+| Command                | Description                                                              |
+| :--------------------- | :----------------------------------------------------------------------- |
+| `km init [--path DIR]` | Create `.km/config.json` and case-exports dirs                           |
+| `km status`            | Print system status JSON                                                 |
+| `km mcp`               | Start MCP stdio server (enables git watcher)                             |
+| `km export-case`       | Export active branch graph to `case-exports/` (or use MCP `export_case`) |
