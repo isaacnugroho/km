@@ -11,9 +11,10 @@ from pyshacl import validate
 from rdflib import BNode, Graph, URIRef
 from rdflib.namespace import RDF, SH
 
+from km.exceptions import KmError
 from km.infrastructure.git.context import GitContext
 from km.infrastructure.rdf.graph_hash import hash_graph_quads
-from km.infrastructure.rdf.shacl_cache import ShaclCache
+from km.infrastructure.rdf.shacl_cache import ShaclCache, filter_prefix_bindings
 from km.infrastructure.rdf.store import QuadStoreWrapper
 from km.logging_config import get_logger
 
@@ -62,11 +63,17 @@ class ValidationService:
             graph_uri,
             self.shacl_cache.prefix_bindings,
         )
-        conforms, report_graph, _ = validate(
-            data_graph,
-            shacl_graph=self.shacl_cache.shapes_graph,
-            advanced=True,
-        )
+        try:
+            conforms, report_graph, _ = validate(
+                data_graph,
+                shacl_graph=self.shacl_cache.shapes_graph,
+                advanced=True,
+            )
+        except Exception as exc:
+            message = str(exc)
+            if "namespace prefix" in message.lower():
+                raise KmError(f"SHACL validation failed due to prefix binding: {message}") from exc
+            raise
         raw_violations = _parse_violations(report_graph, self.shacl_cache.shapes_graph)
         filtered = _filter_with_exceptions(self.case_wrapper, graph_uri, raw_violations)
         conforms_now = len(filtered) == 0
@@ -101,7 +108,7 @@ def _case_graph_to_rdflib(
 
     graph = Graph()
     if prefix_bindings:
-        for prefix, namespace_uri in prefix_bindings.items():
+        for prefix, namespace_uri in filter_prefix_bindings(prefix_bindings).items():
             graph.bind(prefix, namespace_uri)
     for quad in wrapper.quads_in_graph(graph_uri):
         graph.add(

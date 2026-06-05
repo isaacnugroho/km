@@ -235,3 +235,64 @@ def test_approve_non_pending_raises(tmp_workspace_on_write: Path) -> None:
             app.exceptions.approve(proposed["exception_id"], "dev", "sig2", app.git_context)
     finally:
         app.shutdown()
+
+
+def test_validate_with_base_lo_export(tmp_path: Path, caplog) -> None:
+    import json
+    import logging
+
+    from tests.conftest import _init_git_repo
+
+    caplog.set_level(logging.WARNING, logger="km.shacl_cache")
+    lo_root = tmp_path / "base-lo"
+    exports = lo_root / "exports"
+    exports.mkdir(parents=True)
+    (lo_root / "config.json").write_text(
+        json.dumps(
+            {
+                "ontology_id": "base-lo",
+                "base_uri": "http://example.org/base-lo",
+                "prefix": "blo",
+                "quad_store": {"engine": "sqlite-quad", "storage_path": "./lo_quads.db"},
+                "named_graphs": {
+                    "canonical": "http://km.local/learning-ontologies/base-lo/canonical",
+                    "governance": "http://km.local/learning-ontologies/base-lo/governance",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (exports / "main.ttl").write_text(
+        "@base <http://example.org/> .\n"
+        "@prefix blo: <http://example.org/base-lo#> .\n"
+        "@prefix sh: <http://www.w3.org/ns/shacl#> .\n"
+        "blo:SampleClass a <http://www.w3.org/2002/07/owl#Class> .\n",
+        encoding="utf-8",
+    )
+    (exports / "governance").mkdir(exist_ok=True)
+
+    ws = tmp_path / "workspace"
+    ws.mkdir()
+    _init_git_repo(ws)
+    km_dir = ws / ".km"
+    km_dir.mkdir()
+    config = {
+        "workspace_id": "base-lo-workspace",
+        "learning_ontologies": [
+            {"ontology_id": "base-lo", "source": str(lo_root), "mode": "read_only"}
+        ],
+        "lo_cache": {"base_path": "./.km/lo-cache"},
+        "case_exports": {"base_path": "./case-exports", "export_policy": "on_commit"},
+        "branch_merge": {"policy": "auto_merge_exception"},
+    }
+    (km_dir / "config.json").write_text(json.dumps(config, indent=2), encoding="utf-8")
+    (ws / "case-exports" / "graphs").mkdir(parents=True)
+    (ws / "case-exports" / "governance").mkdir(parents=True)
+
+    app = KMApplication.bootstrap(ws)
+    try:
+        result = mcp_tools.handle_validate_constraints(app)
+        assert "conforms" in result
+        assert "violations" in result
+    finally:
+        app.shutdown()

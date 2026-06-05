@@ -34,7 +34,7 @@ Add a learning-ontology binding in `.km/config.json`. Use an absolute path or a 
 ```json
 {
   "ontology_id": "hexagonal-architecture",
-  "source": "../km/usages/ontologies/hexagonal-architecture",
+  "source": "../ontologies/hexagonal-architecture",
   "mode": "read_only"
 }
 ```
@@ -44,7 +44,7 @@ Add a learning-ontology binding in `.km/config.json`. Use an absolute path or a 
 ```json
 {
   "ontology_id": "hexagonal-architecture",
-  "source": "/werkz/personal/km/usages/ontologies/hexagonal-architecture",
+  "source": "../ontologies/hexagonal-architecture",
   "mode": "curator"
 }
 ```

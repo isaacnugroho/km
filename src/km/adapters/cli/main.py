@@ -7,6 +7,7 @@ import json
 import sys
 from pathlib import Path
 
+from km import __version__
 from km.application.bootstrap import KMApplication
 from km.application.services.feature_gate import require_implemented
 from km.application.services.workspace_service import init_workspace
@@ -22,6 +23,11 @@ def main() -> None:
 
 def run_cli(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="km", description="Knowledge Management MCP CLI")
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"km {__version__}",
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     init_parser = sub.add_parser("init", help="Initialize .km/ workspace configuration")

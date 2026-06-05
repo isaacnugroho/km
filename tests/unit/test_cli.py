@@ -11,13 +11,24 @@ from km.adapters.cli.main import cmd_export_case, run_cli
 from km.application.services.workspace_service import init_workspace
 
 
-def test_cmd_init_creates_config(tmp_path: Path, lo_package: Path) -> None:
+def test_cmd_init_creates_config_without_lo(tmp_path: Path) -> None:
+    ws = tmp_path / "proj"
+    ws.mkdir()
+    config_path = init_workspace(ws)
+    assert config_path.is_file()
+    data = json.loads(config_path.read_text())
+    assert data["learning_ontologies"] == []
+    assert (ws / "case-exports" / "graphs").is_dir()
+
+
+def test_cmd_init_creates_config_with_lo_source(tmp_path: Path, lo_package: Path) -> None:
     ws = tmp_path / "proj"
     ws.mkdir()
     config_path = init_workspace(ws, lo_source=str(lo_package))
     assert config_path.is_file()
     data = json.loads(config_path.read_text())
     assert data["learning_ontologies"][0]["ontology_id"] == "hexagonal-architecture"
+    assert data["learning_ontologies"][0]["source"] == str(lo_package)
     assert (ws / "case-exports" / "graphs").is_dir()
 
 
@@ -63,3 +74,12 @@ def test_run_cli_status(tmp_workspace: Path, monkeypatch: pytest.MonkeyPatch, ca
     data = json.loads(out)
     assert data["active_branch"] == "main"
     assert "pending_branch_merges" in data
+
+
+def test_run_cli_version(capsys) -> None:
+    from km import __version__
+
+    with pytest.raises(SystemExit) as exc:
+        run_cli(["--version"])
+    assert exc.value.code == 0
+    assert __version__ in capsys.readouterr().out

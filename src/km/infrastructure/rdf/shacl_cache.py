@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -16,6 +17,32 @@ from km.logging_config import get_logger
 logger = get_logger("shacl_cache")
 
 KM_LEARNING_ONTOLOGY = "http://km.local/learning-ontologies/"
+
+_SPARQL_PREFIX_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
+
+
+def is_usable_sparql_prefix(prefix: str) -> bool:
+    """Return True when prefix is a non-empty SPARQL/QName label suitable for pyshacl."""
+    if not prefix or prefix == ":":
+        return False
+    if prefix.strip() != prefix or not prefix.strip():
+        return False
+    return bool(_SPARQL_PREFIX_PATTERN.match(prefix))
+
+
+def filter_prefix_bindings(bindings: dict[str, str]) -> dict[str, str]:
+    """Drop unusable prefix keys; log a warning for each skipped binding."""
+    filtered: dict[str, str] = {}
+    for prefix, namespace_uri in bindings.items():
+        if not is_usable_sparql_prefix(prefix):
+            logger.warning(
+                "Skipping unusable SPARQL prefix %r (namespace %s)",
+                prefix,
+                namespace_uri,
+            )
+            continue
+        filtered[prefix] = namespace_uri
+    return filtered
 
 
 def lo_prefix_name(ontology_id: str) -> str:
@@ -40,7 +67,7 @@ def collect_export_prefixes(source_path: Path) -> dict[str, str]:
     bindings: dict[str, str] = {}
     for prefix, namespace in parsed.namespace_manager.namespaces():
         bindings[str(prefix)] = str(namespace)
-    return bindings
+    return filter_prefix_bindings(bindings)
 
 
 def inject_lo_sparql_prefixes(
@@ -140,6 +167,7 @@ class ShaclCache:
                 primary_prefix = entry.lo_config.primary_prefix
                 lo_prefixes = collect_export_prefixes(entry.source_path)
                 lo_prefixes[primary_prefix] = primary_ns
+                lo_prefixes = filter_prefix_bindings(lo_prefixes)
 
                 for prefix_name, ns_uri in lo_prefixes.items():
                     merged.bind(prefix_name, Namespace(ns_uri))
@@ -170,5 +198,5 @@ class ShaclCache:
             shapes_graph=merged,
             shape_count=shape_count,
             ontology_ids=ontology_ids,
-            prefix_bindings=prefix_bindings,
+            prefix_bindings=filter_prefix_bindings(prefix_bindings),
         )

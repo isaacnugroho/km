@@ -1,5 +1,7 @@
 # Knowledge Management MCP
 
+[![GitHub Sponsors](https://img.shields.io/github/sponsors/isaacnugroho?label=Sponsor&logo=github)](https://github.com/sponsors/isaacnugroho)
+
 A neuro-symbolic knowledge management system for AI agents — dual-ontology design with SHACL validation, semantic merge requests, and Git-aligned case graphs.
 
 See [docs/knowledge-management-specification.md](docs/knowledge-management-specification.md) for the full engineering spec.
@@ -81,6 +83,15 @@ Initialize a workspace in your project root (creates `.km/config.json` and `case
 km init
 ```
 
+Bind a Learning Ontology from the [external ontologies repository](https://github.com/isaacnugroho/ontologies):
+
+```bash
+git clone https://github.com/isaacnugroho/ontologies.git
+km init --lo-source ../ontologies/<package-dir>
+```
+
+See [usages/ontologies/README.md](usages/ontologies/README.md) for LO package layout and binding details.
+
 Print system status:
 
 ```bash
@@ -137,9 +148,11 @@ Example after `./scripts/build-linux.sh`:
 
 VS Code uses the same shape under `.vscode/mcp.json`, but the root key is `"servers"` instead of `"mcpServers"`.
 
-## Bundled learning ontology
+## Learning ontologies
 
-The repo includes a sample LO at [usages/ontologies/hexagonal-architecture/](usages/ontologies/hexagonal-architecture/). `km init` binds it by default.
+Learning Ontology packages live in the separate [ontologies](https://github.com/isaacnugroho/ontologies) repository. `km init` creates an empty `learning_ontologies` list; use `--lo-source` to bind a package at init time, or edit `.km/config.json` afterward.
+
+Package layout and binding instructions: [usages/ontologies/README.md](usages/ontologies/README.md).
 
 ## Logging
 
@@ -179,7 +192,13 @@ Resources: eight MCP resources are implemented (`km://schemas/learning-ontologie
 
 | Command                | Description                                                              |
 | :--------------------- | :----------------------------------------------------------------------- |
+| `km --version`         | Print package version                                                    |
 | `km init [--path DIR]` | Create `.km/config.json` and case-exports dirs                           |
+| `km init --lo-source PATH` | Initialize and bind one Learning Ontology package                     |
 | `km status`            | Print system status JSON                                                 |
 | `km mcp`               | Start MCP stdio server (enables git watcher)                             |
 | `km export-case`       | Export active branch graph to `case-exports/` (or use MCP `export_case`) |
+
+## Support
+
+If this project helps your work, consider [sponsoring on GitHub](https://github.com/sponsors/isaacnugroho).

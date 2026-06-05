@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-HEXAGONAL_LO = REPO_ROOT / "usages" / "ontologies" / "hexagonal-architecture"
+HEXAGONAL_LO = REPO_ROOT / "tests" / "fixtures" / "lo-packages" / "hexagonal-architecture"
 LO_RUNTIME_IGNORE = shutil.ignore_patterns("lo_quads.db")
 _GIT_ENV = {
     **os.environ,

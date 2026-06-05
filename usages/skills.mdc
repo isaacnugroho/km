@@ -44,7 +44,7 @@ local:useCanvasDrag a react:HighFrequencyEventHook ;
 3. **`conforms: false`** → read `focus_node`, `source_shape`, `message`:
    - Fixable → correct code, re-ingest facts, return to step 1.
    - Not fixable → Skill 3.
-   - Tool error (not `conforms: false`) → report exact message; do not substitute shell `km …`, hand-edited TTL, or test pass for SHACL. Optional diagnostics: MCP **`status`**, MCP **`query_semantic_graph`**, human **`km export-case`**. If error is `Unknown namespace prefix :`, treat as infrastructure bug — report and stop.
+   - Tool error (not `conforms: false`) → report exact message; do not substitute shell `km …`, hand-edited TTL, or test pass for SHACL. Optional diagnostics: MCP **`status`**, MCP **`query_semantic_graph`**, human **`km export-case`**.
 
 ## Skill 3: Local Exception Provisioning
 

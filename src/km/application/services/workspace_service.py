@@ -68,16 +68,28 @@ def init_workspace(target: Path, *, lo_source: str | None = None) -> Path:
     km_dir = target / ".km"
     km_dir.mkdir(parents=True, exist_ok=True)
 
-    source = lo_source or "usages/ontologies/hexagonal-architecture"
-    config = {
-        "workspace_id": target.name or "km-default-workspace",
-        "learning_ontologies": [
+    learning_ontologies: list[dict[str, str]] = []
+    if lo_source is not None:
+        source_path = Path(lo_source)
+        if not source_path.is_absolute():
+            source_path = (target / source_path).resolve()
+        lo_config_path = source_path / "config.json"
+        if lo_config_path.is_file():
+            lo_config = json.loads(lo_config_path.read_text(encoding="utf-8"))
+            ontology_id = lo_config.get("ontology_id", source_path.name)
+        else:
+            ontology_id = source_path.name
+        learning_ontologies.append(
             {
-                "ontology_id": "hexagonal-architecture",
-                "source": source,
+                "ontology_id": ontology_id,
+                "source": lo_source,
                 "mode": "read_only",
             }
-        ],
+        )
+
+    config = {
+        "workspace_id": target.name or "km-default-workspace",
+        "learning_ontologies": learning_ontologies,
         "lo_cache": {"base_path": "./.km/lo-cache"},
         "case_exports": {"base_path": "./case-exports", "export_policy": "on_commit"},
         "branch_merge": {"policy": "auto_merge_exception"},

@@ -1,8 +1,23 @@
-# Bundled Learning Ontologies
+# Learning Ontology Packages
 
 Self-contained **Learning Ontology (LO) source packages** for use with the Knowledge Management MCP. Each package is a directory the daemon can bind to via `.km/config.json`; structure and semantics follow [knowledge-management-specification.md](../../docs/knowledge-management-specification.md) §2.4–2.5.
 
 An LO package can live anywhere on disk — sibling repo, submodule, path under this repo, or system path. The workspace references it by path; named graph URIs depend on `ontology_id` only, not on where the directory sits.
+
+## External ontology repository
+
+Published LO packages are maintained in a separate repository:
+
+- **Repository:** https://github.com/isaacnugroho/ontologies.git
+- **Clone:** `git clone https://github.com/isaacnugroho/ontologies.git`
+
+After cloning, bind a package from your application workspace:
+
+```bash
+km init --lo-source ../ontologies/<package-dir>
+```
+
+Or add a binding manually in `.km/config.json` (see [Workspace binding](#workspace-binding) below).
 
 ---
 
@@ -43,20 +58,20 @@ Add `lo_quads.db` to the LO repo's `.gitignore`. Git authority is always `export
 
 ## `config.json`
 
-Required fields (see [hexagonal-architecture/config.json](hexagonal-architecture/config.json) for a working example):
+Required fields (example):
 
 ```json
 {
-  "ontology_id": "hexagonal-architecture",
-  "base_uri": "http://architecture.org/hexagonal",
-  "prefix": "hex",
+  "ontology_id": "my-domain",
+  "base_uri": "http://example.org/my-domain",
+  "prefix": "mdom",
   "quad_store": {
     "engine": "sqlite-quad",
     "storage_path": "./lo_quads.db"
   },
   "named_graphs": {
-    "canonical": "http://km.local/learning-ontologies/hexagonal-architecture/canonical",
-    "governance": "http://km.local/learning-ontologies/hexagonal-architecture/governance"
+    "canonical": "http://km.local/learning-ontologies/my-domain/canonical",
+    "governance": "http://km.local/learning-ontologies/my-domain/governance"
   }
 }
 ```
@@ -65,7 +80,7 @@ Required fields (see [hexagonal-architecture/config.json](hexagonal-architecture
 | :------------------------ | :------------------------------------------------------------------------------------------------- |
 | `ontology_id`             | Stable slug; MUST match `ontology_id` in the workspace binding and SHOULD match the directory name |
 | `base_uri`                | Public ontology IRI for domain terms (namespace root; trailing `#` added for Turtle)               |
-| `prefix`                  | SPARQL/Turtle prefix for domain terms (e.g. `hex:`); defaults to `ontology_id` with `-` → `_`      |
+| `prefix`                  | SPARQL/Turtle prefix for domain terms (e.g. `mdom:`); defaults to `ontology_id` with `-` → `_`     |
 | `named_graphs.canonical`  | `http://km.local/learning-ontologies/{ontology_id}/canonical`                                      |
 | `named_graphs.governance` | `http://km.local/learning-ontologies/{ontology_id}/governance`                                     |
 
@@ -94,8 +109,8 @@ Add one object per LO under `learning_ontologies` in `.km/config.json`. `source`
   "workspace_id": "my-app-dev",
   "learning_ontologies": [
     {
-      "ontology_id": "hexagonal-architecture",
-      "source": "../km/usages/ontologies/hexagonal-architecture",
+      "ontology_id": "my-domain",
+      "source": "../ontologies/my-domain",
       "mode": "read_only"
     }
   ],
@@ -108,7 +123,7 @@ Add one object per LO under `learning_ontologies` in `.km/config.json`. `source`
 | Form                                     | Resolved against                             |
 | :--------------------------------------- | :------------------------------------------- |
 | Absolute (`/opt/km/ontologies/baking`)   | Used as-is                                   |
-| Relative (`../km-org-ontologies/baking`) | Workspace root (directory containing `.km/`) |
+| Relative (`../ontologies/baking`)        | Workspace root (directory containing `.km/`) |
 | Home (`~/km/ontologies/baking`)          | User home directory                          |
 
 ### Access modes
@@ -135,11 +150,7 @@ Agent reads always use the workspace cache canonical graph, never pending MR pro
 
 ## Available ontologies
 
-| `ontology_id`            | Path                                               | Domain                                      |
-| :----------------------- | :------------------------------------------------- | :------------------------------------------ |
-| `hexagonal-architecture` | [hexagonal-architecture/](hexagonal-architecture/) | Ports and Adapters (hexagonal) architecture |
-
-See each package's `README.md` for vocabulary tables, SHACL shape summaries, and case-fact Turtle examples.
+See the [ontologies repository](https://github.com/isaacnugroho/ontologies) for published packages (for example `hexagonal-architecture`). Each package includes a `README.md` with vocabulary tables, SHACL shape summaries, and case-fact Turtle examples.
 
 ---
 

@@ -46,7 +46,6 @@ If **`validate_constraints`** (or any KM MCP tool) throws or returns a non-resul
 1. Report the exact error message to the developer.
 2. Do not substitute shell commands, hand-edited TTL, or skipped validation.
 3. Optional read-only diagnostics: MCP **`status`**, MCP **`query_semantic_graph`**, or human-run **`km export-case`**.
-4. Known infrastructure issue: if `validate_constraints` fails with `Unknown namespace prefix :`, treat as an MCP/LO prefix-binding bug — not code non-conformance. Report and stop; do not workaround.
 
 ---
 

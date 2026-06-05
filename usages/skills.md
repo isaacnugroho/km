@@ -79,7 +79,6 @@ graph TD
 4.  **Tool error (infrastructure):** If the call fails (not a `conforms: false` result):
     *   Report the exact error message — do not substitute shell `km …`, hand-edited TTL, or test pass for SHACL.
     *   Optional read-only diagnostics: MCP **`status`**, MCP **`query_semantic_graph`**, human **`km export-case`**.
-    *   If error is `Unknown namespace prefix :`, treat as MCP/LO prefix-binding bug — report and stop; do not workaround.
 
 ---
 
