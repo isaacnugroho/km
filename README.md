@@ -1,6 +1,7 @@
 # Knowledge Management MCP
 
 [![GitHub Sponsors](https://img.shields.io/github/sponsors/isaacnugroho?label=Sponsor&logo=github)](https://github.com/sponsors/isaacnugroho)
+[![CI](https://github.com/isaacnugroho/km/actions/workflows/ci.yml/badge.svg)](https://github.com/isaacnugroho/km/actions/workflows/ci.yml)
 
 A neuro-symbolic knowledge management system for AI agents — dual-ontology design with SHACL validation, semantic merge requests, and Git-aligned case graphs.
 
