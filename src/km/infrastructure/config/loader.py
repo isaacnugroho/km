@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from km.exceptions import ConfigError
 from km.infrastructure.config.models import LOBinding, LOPackageConfig, WorkspaceConfig
 from km.infrastructure.paths import resolve_path
+from km.infrastructure.rdf.store import ensure_lo_governance_dir
 
 
 def _load_json_config(
@@ -58,5 +59,7 @@ def validate_lo_binding(
     main_ttl = source_path / "exports" / "main.ttl"
     if not main_ttl.is_file():
         raise ConfigError(f"Missing canonical export: {main_ttl}")
+
+    ensure_lo_governance_dir(source_path)
 
     return source_path, lo_config

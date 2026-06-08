@@ -25,6 +25,12 @@ from km.logging_config import get_logger
 logger = get_logger("case_export")
 
 
+def ensure_case_exports_dirs(exports_root: Path) -> None:
+    """Create ``graphs/`` and ``governance/`` under the case export root when absent."""
+    (exports_root / "graphs").mkdir(parents=True, exist_ok=True)
+    (exports_root / "governance").mkdir(parents=True, exist_ok=True)
+
+
 def compute_case_export_checksums(exports_root: Path) -> dict[str, Any]:
     checksums: dict[str, Any] = {}
     graphs_dir = exports_root / "graphs"

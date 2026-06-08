@@ -8,6 +8,7 @@ from km.application.services.case_export_service import (
     CaseExportService,
     case_exports_need_rebuild,
     compute_case_export_checksums,
+    ensure_case_exports_dirs,
 )
 from km.infrastructure.rdf.graph_uri_migration import (
     migrate_legacy_branch_graphs,
@@ -36,6 +37,8 @@ class CaseStoreService:
     def bootstrap(self) -> QuadStoreWrapper:
         if self.wrapper:
             self.wrapper.close()
+
+        ensure_case_exports_dirs(self.exports_root)
 
         current_checksums = compute_case_export_checksums(self.exports_root)
         has_exports = bool(current_checksums.get("graphs")) or bool(

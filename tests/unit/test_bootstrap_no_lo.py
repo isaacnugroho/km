@@ -33,6 +33,31 @@ def tmp_workspace_no_lo(tmp_path: Path) -> Path:
     return ws
 
 
+def test_bootstrap_ensures_case_governance_dir(tmp_path: Path) -> None:
+    from tests.conftest import _init_git_repo
+
+    ws = tmp_path / "workspace_missing_gov"
+    ws.mkdir()
+    _init_git_repo(ws)
+    km_dir = ws / ".km"
+    km_dir.mkdir()
+    config = {
+        "workspace_id": "test-workspace-missing-gov",
+        "learning_ontologies": [],
+        "lo_cache": {"base_path": "./.km/lo-cache"},
+        "case_exports": {"base_path": "./case-exports", "export_policy": "on_commit"},
+        "branch_merge": {"policy": "auto_merge_exception"},
+    }
+    (km_dir / "config.json").write_text(json.dumps(config, indent=2), encoding="utf-8")
+    (ws / "case-exports" / "graphs").mkdir(parents=True)
+
+    app = KMApplication.bootstrap(ws)
+    try:
+        assert (ws / "case-exports" / "governance").is_dir()
+    finally:
+        app.shutdown()
+
+
 def test_bootstrap_no_lo_workspace(tmp_workspace_no_lo: Path) -> None:
     app = KMApplication.bootstrap(tmp_workspace_no_lo)
     try:

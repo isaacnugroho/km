@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 import time
 from pathlib import Path
 
@@ -80,5 +81,10 @@ def test_touch_main_ttl_triggers_rebuild(tmp_workspace: Path, lo_package: Path) 
 
 
 def test_empty_governance_dir(tmp_workspace: Path, lo_package: Path) -> None:
+    gov_dir = lo_package / "exports" / "governance"
+    if gov_dir.is_dir():
+        shutil.rmtree(gov_dir)
+
     checksums = compute_export_checksums(lo_package)
     assert checksums["governance"] == {}
+    assert gov_dir.is_dir()

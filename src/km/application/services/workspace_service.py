@@ -11,6 +11,7 @@ from typing import Any
 from km.exceptions import KmError, WorkspaceNotFoundError
 from km.infrastructure.config.loader import load_workspace_config, validate_lo_binding
 from km.infrastructure.config.models import LOBinding, LOPackageConfig
+from km.application.services.case_export_service import ensure_case_exports_dirs
 from km.infrastructure.paths import resolve_path
 from km.logging_config import get_logger
 
@@ -127,6 +128,8 @@ def init_workspace(target: Path, *, lo_source: str | None = None) -> Path:
         "case_exports": {"base_path": "./case-exports", "export_policy": "on_commit"},
         "branch_merge": {"policy": "auto_merge_exception"},
     }
+    ensure_case_exports_dirs(target / "case-exports")
+
     config_path = km_dir / "config.json"
     if config_path.exists():
         logger.warning(
@@ -135,9 +138,6 @@ def init_workspace(target: Path, *, lo_source: str | None = None) -> Path:
         )
         return config_path
     config_path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
-
-    (target / "case-exports" / "graphs").mkdir(parents=True, exist_ok=True)
-    (target / "case-exports" / "governance").mkdir(parents=True, exist_ok=True)
 
     logger.info("Initialized workspace at %s", target)
     return config_path

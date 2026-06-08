@@ -47,10 +47,17 @@ def remove_store(path: Path) -> None:
         path.unlink()
 
 
+def ensure_lo_governance_dir(source_path: Path) -> Path:
+    """Create ``exports/governance/`` under an LO package when absent."""
+    governance_dir = source_path / "exports" / "governance"
+    governance_dir.mkdir(parents=True, exist_ok=True)
+    return governance_dir
+
+
 def compute_export_checksums(source_path: Path) -> dict[str, Any]:
     main_path = source_path / "exports" / "main.ttl"
     checksums: dict[str, Any] = {"main.ttl": sha256_file(main_path)}
-    governance_dir = source_path / "exports" / "governance"
+    governance_dir = ensure_lo_governance_dir(source_path)
     gov_checksums: dict[str, str] = {}
     if governance_dir.is_dir():
         for ttl_file in sorted(governance_dir.glob("*.ttl")):
@@ -116,11 +123,10 @@ def import_lo_exports_to_store(
     logger.debug("Importing %s → %s", main_ttl, lo_config.named_graphs.canonical)
     wrapper.load_turtle_into_graph(main_ttl, lo_config.named_graphs.canonical)
 
-    governance_dir = source_path / "exports" / "governance"
-    if governance_dir.is_dir():
-        for ttl_file in sorted(governance_dir.glob("*.ttl")):
-            logger.debug("Importing governance shard %s", ttl_file.name)
-            wrapper.load_turtle_into_graph(ttl_file, lo_config.named_graphs.governance)
+    governance_dir = ensure_lo_governance_dir(source_path)
+    for ttl_file in sorted(governance_dir.glob("*.ttl")):
+        logger.debug("Importing governance shard %s", ttl_file.name)
+        wrapper.load_turtle_into_graph(ttl_file, lo_config.named_graphs.governance)
 
 
 class QuadStoreWrapper:

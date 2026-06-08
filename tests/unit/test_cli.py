@@ -19,6 +19,7 @@ def test_cmd_init_creates_config_without_lo(tmp_path: Path) -> None:
     data = json.loads(config_path.read_text())
     assert data["learning_ontologies"] == []
     assert (ws / "case-exports" / "graphs").is_dir()
+    assert (ws / "case-exports" / "governance").is_dir()
 
 
 def test_cmd_init_creates_config_with_lo_source(
@@ -32,6 +33,7 @@ def test_cmd_init_creates_config_with_lo_source(
     assert data["learning_ontologies"][0]["ontology_id"] == "hexagonal-architecture"
     assert data["learning_ontologies"][0]["source"] == str(lo_package)
     assert (ws / "case-exports" / "graphs").is_dir()
+    assert (ws / "case-exports" / "governance").is_dir()
 
 
 def test_init_workspace_does_not_overwrite_existing_config(
@@ -45,6 +47,20 @@ def test_init_workspace_does_not_overwrite_existing_config(
     config_path.write_text(json.dumps(original), encoding="utf-8")
     init_workspace(ws, lo_source=str(lo_package))
     assert json.loads(config_path.read_text()) == original
+    assert (ws / "case-exports" / "governance").is_dir()
+
+
+def test_init_workspace_ensures_governance_when_config_exists(tmp_path: Path) -> None:
+    ws = tmp_path / "proj"
+    km_dir = ws / ".km"
+    km_dir.mkdir(parents=True)
+    (km_dir / "config.json").write_text(
+        json.dumps({"workspace_id": "legacy", "learning_ontologies": []}),
+        encoding="utf-8",
+    )
+    init_workspace(ws)
+    assert (ws / "case-exports" / "graphs").is_dir()
+    assert (ws / "case-exports" / "governance").is_dir()
 
 
 def test_cmd_export_case_writes_graph_file(
