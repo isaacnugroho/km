@@ -36,7 +36,9 @@ class SchemaService:
                         "prefix": entry.lo_config.primary_prefix,
                         "namespace_uri": entry.lo_config.namespace_uri,
                         "canonical_graph": canonical_uri,
-                        "classes": self._collect_terms(wrapper, canonical_uri, OWL_CLASS),
+                        "classes": self._collect_terms(
+                            wrapper, canonical_uri, OWL_CLASS
+                        ),
                         "object_properties": self._collect_terms(
                             wrapper, canonical_uri, OWL_OBJECT_PROPERTY
                         ),

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 
 from km.adapters.mcp import resources as resource_handlers
 from km.application.bootstrap import KMApplication
@@ -14,7 +13,9 @@ from tests.fixtures_data import SAMPLE_CASE_TURTLE
 def test_schemas_resource_implemented(tmp_workspace: Path) -> None:
     app = KMApplication.bootstrap(tmp_workspace)
     try:
-        content, mime = resource_handlers.read_resource(app, "km://schemas/learning-ontologies")
+        content, mime = resource_handlers.read_resource(
+            app, "km://schemas/learning-ontologies"
+        )
         assert mime == "application/ld+json"
         assert "learning_ontologies" in content
     finally:
@@ -42,7 +43,10 @@ def test_lo_canonical_resource(tmp_workspace: Path) -> None:
         )
         assert mime == "text/turtle"
         assert "hex:ApplicationCore" in content
-        assert "GRAPH <http://km.local/learning-ontologies/hexagonal-architecture/canonical>" in content
+        assert (
+            "GRAPH <http://km.local/learning-ontologies/hexagonal-architecture/canonical>"
+            in content
+        )
     finally:
         app.shutdown()
 
@@ -54,7 +58,10 @@ def test_lo_governance_resource_empty_graph(tmp_workspace: Path) -> None:
             app, "km://learning-ontologies/hexagonal-architecture/governance"
         )
         assert mime == "text/turtle"
-        assert "http://km.local/learning-ontologies/hexagonal-architecture/governance" in content
+        assert (
+            "http://km.local/learning-ontologies/hexagonal-architecture/governance"
+            in content
+        )
     finally:
         app.shutdown()
 

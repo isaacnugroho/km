@@ -11,7 +11,10 @@ from pyoxigraph import Literal, NamedNode, Quad
 
 from km.application.services.lo_cache_service import LOCacheEntry, LOCacheService
 from km.application.services.lo_export_service import LOExportService
-from km.application.services.lo_source_store_service import LOSourceStoreEntry, LOSourceStoreService
+from km.application.services.lo_source_store_service import (
+    LOSourceStoreEntry,
+    LOSourceStoreService,
+)
 from km.application.services.mr_review_doc_service import MRReviewDocService
 from km.application.services.validation_service import ValidationService
 from km.domain.governance import (
@@ -101,7 +104,7 @@ def resolve_doc_identifier(
     for binding, _, _ in binding_data:
         prefix = f"{binding.ontology_id}-"
         if remainder.startswith(prefix):
-            return binding.ontology_id, f"MR-{remainder[len(prefix):]}"
+            return binding.ontology_id, f"MR-{remainder[len(prefix) :]}"
     raise KmError(f"Cannot parse MR review document: {doc_identifier}")
 
 
@@ -133,7 +136,9 @@ class MergeRequestService:
         diff_insertions: str,
         diff_deletions: str = "",
     ) -> dict[str, Any]:
-        binding, lo_config, _source_path = resolve_lo_binding(target_ontology, self.binding_data)
+        binding, lo_config, _source_path = resolve_lo_binding(
+            target_ontology, self.binding_data
+        )
         if binding.mode != AccessMode.CURATOR:
             raise PermissionError(
                 f"propose_semantic_mr requires curator mode on binding '{binding.ontology_id}'"
@@ -151,10 +156,17 @@ class MergeRequestService:
 
         gov_graph = NamedNode(lo_config.named_graphs.governance)
         mr_subject = NamedNode(f"{KM}{mr_id}")
-        rel_review_doc = self.review_docs.review_doc_relative_path(binding.ontology_id, mr_id)
+        rel_review_doc = self.review_docs.review_doc_relative_path(
+            binding.ontology_id, mr_id
+        )
 
         governance_quads = [
-            Quad(mr_subject, NamedNode(RDF_TYPE), NamedNode(KM_SEMANTIC_MERGE_REQUEST), gov_graph),
+            Quad(
+                mr_subject,
+                NamedNode(RDF_TYPE),
+                NamedNode(KM_SEMANTIC_MERGE_REQUEST),
+                gov_graph,
+            ),
             Quad(mr_subject, NamedNode(KM_STATUS), Literal(STATUS_PENDING), gov_graph),
             Quad(
                 mr_subject,
@@ -176,7 +188,9 @@ class MergeRequestService:
                 Literal(created_at, datatype=NamedNode(XSD_DATE_TIME)),
                 gov_graph,
             ),
-            Quad(mr_subject, NamedNode(KM_REVIEW_DOC), Literal(rel_review_doc), gov_graph),
+            Quad(
+                mr_subject, NamedNode(KM_REVIEW_DOC), Literal(rel_review_doc), gov_graph
+            ),
         ]
         if diff_deletions.strip():
             governance_quads.append(
@@ -344,7 +358,9 @@ class MergeRequestService:
             total += len(entry.wrapper.query(query))
         return total
 
-    def _binding_for_ontology(self, ontology_id: str) -> tuple[LOBinding, LOPackageConfig, Path]:
+    def _binding_for_ontology(
+        self, ontology_id: str
+    ) -> tuple[LOBinding, LOPackageConfig, Path]:
         for binding, lo_config, source_path in self.binding_data:
             if binding.ontology_id == ontology_id:
                 return binding, lo_config, source_path
@@ -401,7 +417,9 @@ class MergeRequestService:
         proposal_uri: str,
         canonical: NamedNode,
     ) -> None:
-        deletions = self._literal_object(entry, mr_subject, gov_graph, KM_DIFF_DELETIONS)
+        deletions = self._literal_object(
+            entry, mr_subject, gov_graph, KM_DIFF_DELETIONS
+        )
         if not deletions:
             return
         for quad in self._parse_diff(deletions, proposal_uri, "deletions"):

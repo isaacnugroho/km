@@ -107,7 +107,9 @@ def test_mcp_exception_loop(tmp_workspace_on_write: Path) -> None:
 def test_schemas_resource_integration(tmp_workspace: Path) -> None:
     app = KMApplication.bootstrap(tmp_workspace)
     try:
-        content, mime = resource_handlers.read_resource(app, "km://schemas/learning-ontologies")
+        content, mime = resource_handlers.read_resource(
+            app, "km://schemas/learning-ontologies"
+        )
         assert mime == "application/ld+json"
         doc = json.loads(content)
         assert doc["learning_ontologies"]

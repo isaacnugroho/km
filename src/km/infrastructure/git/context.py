@@ -25,7 +25,9 @@ class GitContextHolder:
 
     @classmethod
     def create(cls, workspace_root: Path) -> GitContextHolder:
-        return cls(workspace_root=workspace_root, context=read_git_context(workspace_root))
+        return cls(
+            workspace_root=workspace_root, context=read_git_context(workspace_root)
+        )
 
     def refresh(self) -> tuple[GitContext, GitContext]:
         previous = self.context

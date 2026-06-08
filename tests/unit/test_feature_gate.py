@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import pytest
 
 from km.application.services import feature_gate
 from km.application.services.feature_gate import require_implemented
-from km.exceptions import FeatureNotImplementedError
 
 
 def test_all_features_enabled() -> None:

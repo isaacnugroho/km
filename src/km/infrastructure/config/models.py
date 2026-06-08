@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -72,7 +71,9 @@ class LOPackageConfig(BaseModel):
     ontology_id: str
     base_uri: str
     prefix: str | None = None
-    quad_store: QuadStoreConfig = Field(default_factory=lambda: QuadStoreConfig(storage_path="./lo_quads.db"))
+    quad_store: QuadStoreConfig = Field(
+        default_factory=lambda: QuadStoreConfig(storage_path="./lo_quads.db")
+    )
     named_graphs: LOPackageNamedGraphs
 
     @property

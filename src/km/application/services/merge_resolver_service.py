@@ -96,7 +96,9 @@ def resolve_merge_event_fingerprint(
     detected = detect_recent_merge(workspace_root, target_branch)
     if detected and detected[0] == source_branch:
         return detected[1]
-    digest = hashlib.sha256(f"{source_branch}:{target_branch}".encode()).hexdigest()[:16]
+    digest = hashlib.sha256(f"{source_branch}:{target_branch}".encode()).hexdigest()[
+        :16
+    ]
     return f"mcp-{digest}"
 
 
@@ -113,7 +115,9 @@ class MergeResolverService:
         self.case_export = case_export
         self.prompt_store = prompt_store
         self.processed_store = processed_store
-        self.processed_events = processed_events if processed_events is not None else set()
+        self.processed_events = (
+            processed_events if processed_events is not None else set()
+        )
 
     def list_pending(self) -> list[dict[str, Any]]:
         return self.prompt_store.list_pending()
@@ -133,7 +137,9 @@ class MergeResolverService:
         event_id = build_merge_event_id(source_branch, target_branch, fingerprint)
 
         if self.prompt_store.prompt_path(event_id).is_file():
-            return self._sync_response_from_prompt(self.prompt_store.read_prompt(event_id))
+            return self._sync_response_from_prompt(
+                self.prompt_store.read_prompt(event_id)
+            )
 
         if self.processed_store.contains(event_id):
             return self._sync_no_action(
@@ -152,7 +158,9 @@ class MergeResolverService:
         )
 
         if self.prompt_store.prompt_path(event_id).is_file():
-            return self._sync_response_from_prompt(self.prompt_store.read_prompt(event_id))
+            return self._sync_response_from_prompt(
+                self.prompt_store.read_prompt(event_id)
+            )
 
         if result is None:
             return self._sync_no_action(
@@ -164,9 +172,13 @@ class MergeResolverService:
             )
 
         if result.prompt_written:
-            return self._sync_response_from_prompt(self.prompt_store.read_prompt(event_id))
+            return self._sync_response_from_prompt(
+                self.prompt_store.read_prompt(event_id)
+            )
 
-        status = "AUTO_MERGED" if policy == BranchMergePolicy.AUTO_MERGE else "NO_ACTION"
+        status = (
+            "AUTO_MERGED" if policy == BranchMergePolicy.AUTO_MERGE else "NO_ACTION"
+        )
         return {
             "event_id": event_id,
             "status": status,
@@ -324,7 +336,9 @@ class MergeResolverService:
             if prompt["policy"] == BranchMergePolicy.NO_AUTO_MERGE.value:
                 triples_imported = self._copy_all_quads(source_uri, target_uri)
             else:
-                triples_imported = self._copy_non_exception_quads(source_uri, target_uri)
+                triples_imported = self._copy_non_exception_quads(
+                    source_uri, target_uri
+                )
         elif resolution == "DELETE":
             if prompt["policy"] == BranchMergePolicy.NO_AUTO_MERGE.value:
                 self._clear_graph(source_uri)
@@ -414,7 +428,6 @@ class MergeResolverService:
         )
 
     def _delete_non_exception_triples(self, graph_uri: str) -> None:
-        graph = NamedNode(graph_uri)
         exception_subjects = self._approved_exception_subjects(graph_uri)
         for quad in list(self.case_wrapper.quads_in_graph(graph_uri)):
             if quad.subject not in exception_subjects:
@@ -439,7 +452,9 @@ class MergeResolverService:
         node = NamedNode(f"{KM}{event_id}")
         graph = NamedNode(CASE_GOVERNANCE_GRAPH)
         quads = [
-            Quad(node, NamedNode(RDF_TYPE), NamedNode(KM_BRANCH_MERGE_RESOLUTION), graph),
+            Quad(
+                node, NamedNode(RDF_TYPE), NamedNode(KM_BRANCH_MERGE_RESOLUTION), graph
+            ),
             Quad(node, NamedNode(KM_SOURCE_GRAPH), NamedNode(source_uri), graph),
             Quad(node, NamedNode(KM_TARGET_GRAPH), NamedNode(target_uri), graph),
             Quad(node, NamedNode(KM_RESOLUTION), Literal(resolution), graph),

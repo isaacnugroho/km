@@ -31,7 +31,9 @@ class ProcessedMergeEventStore:
         try:
             data = json.loads(self.path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
-            logger.warning("Ignoring corrupt processed merge events file: %s", self.path)
+            logger.warning(
+                "Ignoring corrupt processed merge events file: %s", self.path
+            )
             return
         ids = data.get("event_ids")
         if isinstance(ids, list):

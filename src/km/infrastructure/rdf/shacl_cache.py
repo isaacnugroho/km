@@ -95,7 +95,9 @@ def inject_lo_sparql_prefixes(
             declare_node = BNode()
             graph.add((ont, SH.declare, declare_node))
             graph.add((declare_node, SH.prefix, Literal(prefix)))
-            graph.add((declare_node, SH.namespace, Literal(str(ns), datatype=XSD.anyURI)))
+            graph.add(
+                (declare_node, SH.namespace, Literal(str(ns), datatype=XSD.anyURI))
+            )
 
     if (ont, RDF.type, OWL.Ontology) not in graph:
         graph.add((ont, RDF.type, OWL.Ontology))
@@ -106,8 +108,7 @@ def inject_lo_sparql_prefixes(
 
 
 def _quads_to_rdflib(quads: list) -> Graph:
-    from rdflib import BNode, Graph, Literal as RDFLiteral, URIRef
-    from pyoxigraph import BlankNode, Literal, NamedNode
+    from rdflib import Graph, URIRef
 
     graph = Graph()
     for quad in quads:
@@ -183,7 +184,9 @@ class ShaclCache:
                     lo_prefixes,
                 )
 
-                for _ in lo_graph.subjects(RDF.type, URIRef("http://www.w3.org/ns/shacl#NodeShape")):
+                for _ in lo_graph.subjects(
+                    RDF.type, URIRef("http://www.w3.org/ns/shacl#NodeShape")
+                ):
                     shape_count += 1
             finally:
                 wrapper.close()

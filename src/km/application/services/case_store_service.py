@@ -55,7 +55,9 @@ class CaseStoreService:
 
         if rebuild and has_exports:
             logger.info("Bootstrapping case store from case-exports")
-            CaseExportService.rebuild_store_from_exports(self.exports_root, self.case_db_path)
+            CaseExportService.rebuild_store_from_exports(
+                self.exports_root, self.case_db_path
+            )
         elif not store_exists(self.case_db_path):
             logger.info("Creating empty case store at %s", self.case_db_path)
 

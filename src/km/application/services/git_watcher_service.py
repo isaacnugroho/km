@@ -6,7 +6,7 @@ from pathlib import Path
 
 from km.application.services.branch_inheritance_service import BranchInheritanceService
 from km.application.services.merge_resolver_service import MergeResolverService
-from km.infrastructure.config.models import BranchMergePolicy, WorkspaceConfig
+from km.infrastructure.config.models import WorkspaceConfig
 from km.infrastructure.git.context import GitContextHolder
 from km.infrastructure.git.merge_base import detect_recent_merge
 from km.infrastructure.git.ref_watcher import RefWatcher
@@ -58,7 +58,9 @@ class GitWatcherService:
             self.inheritance.ensure_inherited(self.git, self.workspace_root)
 
         policy = self.config.branch_merge.policy
-        for head_file in sorted((self.workspace_root / ".git" / "refs" / "heads").glob("*")):
+        for head_file in sorted(
+            (self.workspace_root / ".git" / "refs" / "heads").glob("*")
+        ):
             if not head_file.is_file():
                 continue
             target_branch = head_file.name

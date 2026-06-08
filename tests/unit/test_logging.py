@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import sys
 
-from km.logging_config import configure_logging, get_logger, has_stdout_handler
+from km.logging_config import configure_logging, has_stdout_handler
 
 
 def test_configure_logging_debug(monkeypatch) -> None:

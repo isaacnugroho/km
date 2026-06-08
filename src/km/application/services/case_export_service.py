@@ -170,7 +170,9 @@ class CaseExportService:
         export_path.parent.mkdir(parents=True, exist_ok=True)
         turtle = self.case_wrapper.serialize_graph(git_context.graph_uri)
         export_path.write_text(turtle, encoding="utf-8")
-        write_case_branch_sync_manifest(self.km_dir, git_context.active_ref, export_path)
+        write_case_branch_sync_manifest(
+            self.km_dir, git_context.active_ref, export_path
+        )
         write_case_governance_sync_manifest(self.km_dir, self.exports_root)
         logger.info("Exported case graph to %s", export_path)
         return export_path

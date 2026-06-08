@@ -103,7 +103,9 @@ def summarize_semantic_changes(diff_insertions: str, diff_deletions: str = "") -
     lines: list[str] = []
     ins_count = len(insert_graph) if insert_graph else 0
     del_count = len(delete_graph) if delete_graph else 0
-    lines.append(f"- **Triple delta:** +{ins_count} insertion(s), -{del_count} deletion(s)")
+    lines.append(
+        f"- **Triple delta:** +{ins_count} insertion(s), -{del_count} deletion(s)"
+    )
 
     if insert_graph:
         lines.extend(_type_labels(insert_graph, added=True))

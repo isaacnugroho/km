@@ -21,7 +21,9 @@ def test_cmd_init_creates_config_without_lo(tmp_path: Path) -> None:
     assert (ws / "case-exports" / "graphs").is_dir()
 
 
-def test_cmd_init_creates_config_with_lo_source(tmp_path: Path, lo_package: Path) -> None:
+def test_cmd_init_creates_config_with_lo_source(
+    tmp_path: Path, lo_package: Path
+) -> None:
     ws = tmp_path / "proj"
     ws.mkdir()
     config_path = init_workspace(ws, lo_source=str(lo_package))
@@ -67,7 +69,9 @@ def test_cmd_export_case_writes_graph_file(
     assert manifest.is_file()
 
 
-def test_run_cli_status(tmp_workspace: Path, monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+def test_run_cli_status(
+    tmp_workspace: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
     monkeypatch.setenv("KM_WORKSPACE_ROOT", str(tmp_workspace))
     assert run_cli(["status"]) == 0
     out = capsys.readouterr().out

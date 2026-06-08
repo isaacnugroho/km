@@ -28,7 +28,9 @@ def test_is_store_lock_error_detects_lock_message() -> None:
 
 
 def test_is_store_lock_error_detects_eagain() -> None:
-    assert is_store_lock_error(OSError(errno.EAGAIN, "Resource temporarily unavailable"))
+    assert is_store_lock_error(
+        OSError(errno.EAGAIN, "Resource temporarily unavailable")
+    )
 
 
 def test_store_open_error_lock() -> None:
@@ -88,7 +90,9 @@ def test_as_km_error_json_decode() -> None:
 
 
 def test_as_km_error_os_lock_without_path() -> None:
-    err = as_km_error(OSError("While lock file: /tmp/db/LOCK: Resource temporarily unavailable"))
+    err = as_km_error(
+        OSError("While lock file: /tmp/db/LOCK: Resource temporarily unavailable")
+    )
     assert err is not None
     assert "locked by another process" in str(err)
 
@@ -105,7 +109,10 @@ def test_quad_store_wrapper_raises_km_error_on_lock(tmp_path: Path) -> None:
 
 def test_quad_store_wrapper_raises_km_error_on_no_space(tmp_path: Path) -> None:
     store_path = tmp_path / "lo_quads.db"
-    with patch("km.infrastructure.rdf.store.Store", side_effect=OSError(errno.ENOSPC, "No space")):
+    with patch(
+        "km.infrastructure.rdf.store.Store",
+        side_effect=OSError(errno.ENOSPC, "No space"),
+    ):
         with pytest.raises(KmError, match="no space left on device"):
             QuadStoreWrapper(store_path)
 
@@ -113,7 +120,9 @@ def test_quad_store_wrapper_raises_km_error_on_no_space(tmp_path: Path) -> None:
 def test_quad_store_wrapper_invalid_rdf_raises_km_error(tmp_path: Path) -> None:
     wrapper = QuadStoreWrapper(tmp_path / "db")
     with pytest.raises(KmError, match="Failed to load RDF"):
-        wrapper.load_turtle_bytes_into_graph(b"not valid turtle {{{", "http://example.org/g")
+        wrapper.load_turtle_bytes_into_graph(
+            b"not valid turtle {{{", "http://example.org/g"
+        )
 
 
 def test_quad_store_wrapper_invalid_sparql_raises_km_error(tmp_path: Path) -> None:

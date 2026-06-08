@@ -59,7 +59,9 @@ class StatusService:
                     "source": str(entry.source_path),
                     "mode": entry.binding.mode.value,
                     "cache_path": str(entry.cache_dir),
-                    "cache_synced_at": entry.manifest.synced_at if entry.manifest else None,
+                    "cache_synced_at": entry.manifest.synced_at
+                    if entry.manifest
+                    else None,
                 }
             )
 

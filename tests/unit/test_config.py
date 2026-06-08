@@ -101,7 +101,9 @@ def test_validate_lo_binding_ok(tmp_workspace: Path, lo_package: Path) -> None:
     assert lo_cfg.ontology_id == "hexagonal-architecture"
 
 
-def test_validate_lo_binding_ontology_id_mismatch(tmp_workspace: Path, lo_package: Path) -> None:
+def test_validate_lo_binding_ontology_id_mismatch(
+    tmp_workspace: Path, lo_package: Path
+) -> None:
     binding = LOBinding(
         ontology_id="wrong-id",
         source=str(lo_package),
@@ -111,7 +113,9 @@ def test_validate_lo_binding_ontology_id_mismatch(tmp_workspace: Path, lo_packag
         validate_lo_binding(binding, tmp_workspace)
 
 
-def test_validate_lo_binding_missing_main_ttl(tmp_workspace: Path, lo_package: Path) -> None:
+def test_validate_lo_binding_missing_main_ttl(
+    tmp_workspace: Path, lo_package: Path
+) -> None:
     (lo_package / "exports" / "main.ttl").unlink()
     binding = LOBinding(
         ontology_id="hexagonal-architecture",

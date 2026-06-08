@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
@@ -10,7 +9,6 @@ import pytest
 from km.adapters.mcp import resources as resource_handlers
 from km.adapters.mcp import tools as mcp_tools
 from km.application.bootstrap import KMApplication
-from km.application.services.case_export_service import CaseExportService
 from km.exceptions import KmError
 from km.infrastructure.rdf.ref_mapping import (
     branch_path_to_graph_uri,
@@ -25,7 +23,10 @@ def test_ref_mapping_round_trip() -> None:
     assert ref_to_export_filename(ref) == "refs-heads-feature-collaborative-canvas.ttl"
     branch = ref_to_branch_path(ref)
     assert branch == "feature/collaborative-canvas"
-    assert branch_path_to_graph_uri(branch) == "http://km.local/graphs/feature-collaborative-canvas"
+    assert (
+        branch_path_to_graph_uri(branch)
+        == "http://km.local/graphs/feature-collaborative-canvas"
+    )
 
 
 def test_ingest_turtle(tmp_workspace: Path) -> None:
@@ -71,7 +72,9 @@ def test_ingest_on_write_exports(tmp_workspace_on_write: Path) -> None:
     app = KMApplication.bootstrap(tmp_workspace_on_write)
     try:
         mcp_tools.handle_ingest_case_facts(app, SAMPLE_CASE_TURTLE, "turtle")
-        export_file = tmp_workspace_on_write / "case-exports" / "graphs" / "refs-heads-main.ttl"
+        export_file = (
+            tmp_workspace_on_write / "case-exports" / "graphs" / "refs-heads-main.ttl"
+        )
         assert export_file.is_file()
         assert "http://km.local/cases/my_core" in export_file.read_text()
         assert (tmp_workspace_on_write / ".km" / "main_sync-manifest.json").is_file()
@@ -144,7 +147,9 @@ def test_export_deterministic(tmp_workspace_on_write: Path) -> None:
     app = KMApplication.bootstrap(tmp_workspace_on_write)
     try:
         mcp_tools.handle_ingest_case_facts(app, SAMPLE_CASE_TURTLE, "turtle")
-        path = tmp_workspace_on_write / "case-exports" / "graphs" / "refs-heads-main.ttl"
+        path = (
+            tmp_workspace_on_write / "case-exports" / "graphs" / "refs-heads-main.ttl"
+        )
         first = path.read_bytes()
         app.case_export.export_branch(app.git_context)
         second = path.read_bytes()

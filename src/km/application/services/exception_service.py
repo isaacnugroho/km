@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -55,7 +54,9 @@ class ExceptionService:
 
         quads = [
             Quad(exc_node, NamedNode(RDF_TYPE), NamedNode(KM_LOCAL_EXCEPTION), graph),
-            Quad(exc_node, NamedNode(KM_BYPASSES_SHAPE), NamedNode(bypasses_shape), graph),
+            Quad(
+                exc_node, NamedNode(KM_BYPASSES_SHAPE), NamedNode(bypasses_shape), graph
+            ),
             Quad(exc_node, NamedNode(KM_TARGET_NODE), NamedNode(target_node), graph),
             Quad(exc_node, NamedNode(KM_RATIONALE), Literal(rationale), graph),
             Quad(exc_node, NamedNode(KM_STATUS), Literal(STATUS_PENDING), graph),
@@ -74,14 +75,20 @@ class ExceptionService:
         signature: str,
         git_context: GitContext,
     ) -> dict[str, Any]:
-        exc_uri = exception_id if exception_id.startswith("http") else f"{EXCEPTION_BASE}{exception_id}"
+        exc_uri = (
+            exception_id
+            if exception_id.startswith("http")
+            else f"{EXCEPTION_BASE}{exception_id}"
+        )
         graph_uri = git_context.graph_uri
         graph = NamedNode(graph_uri)
         exc_node = NamedNode(exc_uri)
 
         status = self._get_exception_status(exc_node, graph)
         if status != STATUS_PENDING:
-            raise KmError(f"Exception {exc_uri} is not PENDING_APPROVAL (status={status})")
+            raise KmError(
+                f"Exception {exc_uri} is not PENDING_APPROVAL (status={status})"
+            )
 
         timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
         self.case_wrapper.store.remove(
@@ -90,13 +97,20 @@ class ExceptionService:
         self.case_wrapper.store.add(
             Quad(exc_node, NamedNode(KM_STATUS), Literal(STATUS_APPROVED), graph)
         )
-        self.case_wrapper.store.add(Quad(exc_node, NamedNode(KM_APPROVED_BY), Literal(approver), graph))
-        self.case_wrapper.store.add(Quad(exc_node, NamedNode(KM_SIGNATURE), Literal(signature), graph))
+        self.case_wrapper.store.add(
+            Quad(exc_node, NamedNode(KM_APPROVED_BY), Literal(approver), graph)
+        )
+        self.case_wrapper.store.add(
+            Quad(exc_node, NamedNode(KM_SIGNATURE), Literal(signature), graph)
+        )
         self.case_wrapper.store.add(
             Quad(
                 exc_node,
                 NamedNode(KM_TIMESTAMP),
-                Literal(timestamp, datatype=NamedNode("http://www.w3.org/2001/XMLSchema#dateTime")),
+                Literal(
+                    timestamp,
+                    datatype=NamedNode("http://www.w3.org/2001/XMLSchema#dateTime"),
+                ),
                 graph,
             )
         )
@@ -140,8 +154,14 @@ class ExceptionService:
             results.append(entry)
         return results
 
-    def get_exception(self, exception_id: str, git_context: GitContext) -> dict[str, Any]:
-        exc_uri = exception_id if exception_id.startswith("http") else f"{EXCEPTION_BASE}{exception_id}"
+    def get_exception(
+        self, exception_id: str, git_context: GitContext
+    ) -> dict[str, Any]:
+        exc_uri = (
+            exception_id
+            if exception_id.startswith("http")
+            else f"{EXCEPTION_BASE}{exception_id}"
+        )
         for entry in self.list_exceptions(git_context):
             if entry["exception_id"] == exc_uri:
                 return entry
@@ -149,10 +169,14 @@ class ExceptionService:
 
     def count_pending(self, git_context: GitContext) -> int:
         return sum(
-            1 for exc in self.list_exceptions(git_context) if exc.get("status") == STATUS_PENDING
+            1
+            for exc in self.list_exceptions(git_context)
+            if exc.get("status") == STATUS_PENDING
         )
 
-    def _get_exception_status(self, exc_node: NamedNode, graph: NamedNode) -> str | None:
+    def _get_exception_status(
+        self, exc_node: NamedNode, graph: NamedNode
+    ) -> str | None:
         for quad in self.case_wrapper.store.quads_for_pattern(
             exc_node, NamedNode(KM_STATUS), None, graph
         ):

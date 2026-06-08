@@ -12,7 +12,9 @@ from km.infrastructure.config.models import LOBinding, LOPackageConfig, Workspac
 from km.infrastructure.paths import resolve_path
 
 
-def _load_json_config(config_path: Path, model: type[WorkspaceConfig] | type[LOPackageConfig]):
+def _load_json_config(
+    config_path: Path, model: type[WorkspaceConfig] | type[LOPackageConfig]
+):
     try:
         data = json.loads(config_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
@@ -39,7 +41,9 @@ def load_lo_package_config(source_path: Path) -> LOPackageConfig:
     return _load_json_config(config_path, LOPackageConfig)
 
 
-def validate_lo_binding(binding: LOBinding, workspace_root: Path) -> tuple[Path, LOPackageConfig]:
+def validate_lo_binding(
+    binding: LOBinding, workspace_root: Path
+) -> tuple[Path, LOPackageConfig]:
     source_path = resolve_path(binding.source, workspace_root)
     if not source_path.is_dir():
         raise ConfigError(f"LO source path does not exist: {source_path}")

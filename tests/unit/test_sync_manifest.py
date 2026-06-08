@@ -23,7 +23,10 @@ from km.infrastructure.sync_manifest import (
 def test_branch_path_to_slug() -> None:
     assert branch_path_to_slug("main") == "main"
     assert branch_path_to_slug("feature/foo") == "feature-foo"
-    assert branch_path_to_slug("feature/collaborative-canvas") == "feature-collaborative-canvas"
+    assert (
+        branch_path_to_slug("feature/collaborative-canvas")
+        == "feature-collaborative-canvas"
+    )
 
 
 def test_ref_to_branch_slug() -> None:

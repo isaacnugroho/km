@@ -6,7 +6,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from km.exceptions import KmError
-from km.infrastructure.rdf.diff_renderer import render_semantic_diff, summarize_semantic_changes
+from km.infrastructure.rdf.diff_renderer import (
+    render_semantic_diff,
+    summarize_semantic_changes,
+)
 from km.logging_config import get_logger
 
 logger = get_logger("mr_review_doc")
@@ -82,10 +85,14 @@ class MRReviewDocService:
         text = path.read_text(encoding="utf-8")
         for pending in ("PENDING_APPROVAL", "APPROVED", "REJECTED"):
             if f"**Status:** {pending}" in text:
-                text = text.replace(f"**Status:** {pending}", f"**Status:** {status}", 1)
+                text = text.replace(
+                    f"**Status:** {pending}", f"**Status:** {status}", 1
+                )
                 break
         if timestamp and "**Resolved At:**" not in text:
-            text = text.replace("**Author:**", f"**Resolved At:** {timestamp}\n**Author:**", 1)
+            text = text.replace(
+                "**Author:**", f"**Resolved At:** {timestamp}\n**Author:**", 1
+            )
         path.write_text(text, encoding="utf-8")
         logger.info("Updated MR review doc %s status to %s", path, status)
 

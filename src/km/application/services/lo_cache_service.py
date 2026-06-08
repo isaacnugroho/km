@@ -39,10 +39,14 @@ class LOCacheService:
         self.lo_cache_base = lo_cache_base
         self.entries: list[LOCacheEntry] = []
 
-    def sync_binding(self, binding: LOBinding, lo_config: LOPackageConfig, source_path: Path) -> LOCacheEntry:
+    def sync_binding(
+        self, binding: LOBinding, lo_config: LOPackageConfig, source_path: Path
+    ) -> LOCacheEntry:
         cache_dir = self.lo_cache_base / binding.ontology_id
         cache_db = cache_dir / "lo_quads.db"
-        manifest_path = lo_sync_manifest_path(workspace_km_dir(self.workspace_root), binding.ontology_id)
+        manifest_path = lo_sync_manifest_path(
+            workspace_km_dir(self.workspace_root), binding.ontology_id
+        )
 
         current_checksums = compute_export_checksums(source_path)
         rebuild = needs_cache_rebuild(cache_db, manifest_path, current_checksums)
@@ -96,7 +100,9 @@ class LOCacheService:
         finally:
             wrapper.close()
 
-    def sync_all(self, bindings: list[tuple[LOBinding, LOPackageConfig, Path]]) -> list[LOCacheEntry]:
+    def sync_all(
+        self, bindings: list[tuple[LOBinding, LOPackageConfig, Path]]
+    ) -> list[LOCacheEntry]:
         self.entries.clear()
         for binding, lo_config, source_path in bindings:
             self.sync_binding(binding, lo_config, source_path)
@@ -109,5 +115,7 @@ class LOCacheService:
         source_path: Path,
     ) -> LOCacheEntry:
         """Replace cache entry after source exports change (e.g. MR approve)."""
-        self.entries = [e for e in self.entries if e.binding.ontology_id != binding.ontology_id]
+        self.entries = [
+            e for e in self.entries if e.binding.ontology_id != binding.ontology_id
+        ]
         return self.sync_binding(binding, lo_config, source_path)

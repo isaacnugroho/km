@@ -17,9 +17,7 @@ from km.logging_config import get_logger
 
 logger = get_logger("graph_uri_migration")
 
-_LEGACY_GRAPH_URI_RE = re.compile(
-    r"http://km\.local/graphs/([^>\s\"]+)"
-)
+_LEGACY_GRAPH_URI_RE = re.compile(r"http://km\.local/graphs/([^>\s\"]+)")
 
 
 def _legacy_branch_graph_uris(wrapper: QuadStoreWrapper) -> list[str]:

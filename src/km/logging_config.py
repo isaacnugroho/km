@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import os
 import sys
-from typing import Literal
 
 DEFAULT_FORMAT = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
 
@@ -50,14 +49,18 @@ def configure_logging(
     if mcp_mode:
         _ensure_no_stdout_handlers(root)
         if has_stdout_handler():
-            raise RuntimeError("KM logging must not attach handlers to stdout in MCP mode")
+            raise RuntimeError(
+                "KM logging must not attach handlers to stdout in MCP mode"
+            )
 
 
 def _ensure_no_stdout_handlers(logger: logging.Logger) -> None:
     for handler in logger.handlers:
         stream = getattr(handler, "stream", None)
         if stream is sys.stdout:
-            raise RuntimeError("KM logging must not attach handlers to stdout in MCP mode")
+            raise RuntimeError(
+                "KM logging must not attach handlers to stdout in MCP mode"
+            )
 
 
 def get_logger(name: str) -> logging.Logger:

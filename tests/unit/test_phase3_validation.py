@@ -11,6 +11,7 @@ from km.adapters.mcp import resources as resource_handlers
 from km.adapters.mcp import tools as mcp_tools
 from km.application.bootstrap import KMApplication
 from km.exceptions import KmError
+
 HEX = "http://architecture.org/hexagonal#"
 CASE = "http://km.local/cases/"
 
@@ -180,7 +181,9 @@ def test_pending_exceptions_count(tmp_workspace: Path) -> None:
 def test_schemas_resource_lists_hex_classes(tmp_workspace: Path) -> None:
     app = KMApplication.bootstrap(tmp_workspace)
     try:
-        content, mime = resource_handlers.read_resource(app, "km://schemas/learning-ontologies")
+        content, mime = resource_handlers.read_resource(
+            app, "km://schemas/learning-ontologies"
+        )
         assert mime == "application/ld+json"
         doc = json.loads(content)
         lo = doc["learning_ontologies"][0]
@@ -203,14 +206,17 @@ def test_active_exceptions_resource(tmp_workspace_on_write: Path) -> None:
             f"{CASE}api",
             "Listed exception",
         )
-        content, mime = resource_handlers.read_resource(app, "km://case/active-exceptions")
+        content, mime = resource_handlers.read_resource(
+            app, "km://case/active-exceptions"
+        )
         assert mime == "application/json"
         items = json.loads(content)
         assert len(items) == 1
         assert items[0]["status"] == "PENDING_APPROVAL"
 
         single, _ = resource_handlers.read_resource(
-            app, f"km://case/active-exceptions/{proposed['exception_id'].split('/')[-1]}"
+            app,
+            f"km://case/active-exceptions/{proposed['exception_id'].split('/')[-1]}",
         )
         record = json.loads(single)
         assert record["exception_id"] == proposed["exception_id"]
@@ -232,7 +238,9 @@ def test_approve_non_pending_raises(tmp_workspace_on_write: Path) -> None:
             app, proposed["exception_id"], "dev", "sig"
         )
         with pytest.raises(KmError, match="not PENDING_APPROVAL"):
-            app.exceptions.approve(proposed["exception_id"], "dev", "sig2", app.git_context)
+            app.exceptions.approve(
+                proposed["exception_id"], "dev", "sig2", app.git_context
+            )
     finally:
         app.shutdown()
 
@@ -253,7 +261,10 @@ def test_validate_with_base_lo_export(tmp_path: Path, caplog) -> None:
                 "ontology_id": "base-lo",
                 "base_uri": "http://example.org/base-lo",
                 "prefix": "blo",
-                "quad_store": {"engine": "sqlite-quad", "storage_path": "./lo_quads.db"},
+                "quad_store": {
+                    "engine": "sqlite-quad",
+                    "storage_path": "./lo_quads.db",
+                },
                 "named_graphs": {
                     "canonical": "http://km.local/learning-ontologies/base-lo/canonical",
                     "governance": "http://km.local/learning-ontologies/base-lo/governance",

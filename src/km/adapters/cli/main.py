@@ -11,7 +11,7 @@ from km import __version__
 from km.application.bootstrap import KMApplication
 from km.application.services.feature_gate import require_implemented
 from km.application.services.workspace_service import init_workspace
-from km.exceptions import FeatureNotImplementedError, KmError, as_km_error
+from km.exceptions import FeatureNotImplementedError, as_km_error
 from km.logging_config import configure_logging, get_logger
 
 logger = get_logger("cli")
@@ -22,7 +22,9 @@ def main() -> None:
 
 
 def run_cli(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="km", description="Knowledge Management MCP CLI")
+    parser = argparse.ArgumentParser(
+        prog="km", description="Knowledge Management MCP CLI"
+    )
     parser.add_argument(
         "--version",
         action="version",
@@ -45,7 +47,9 @@ def run_cli(argv: list[str] | None = None) -> int:
 
     sub.add_parser("status", help="Print system status JSON")
     sub.add_parser("mcp", help="Start MCP server (stdio)")
-    sub.add_parser("export-case", help="Export active branch case graph to case-exports/")
+    sub.add_parser(
+        "export-case", help="Export active branch case graph to case-exports/"
+    )
 
     args = parser.parse_args(argv)
     configure_logging(mcp_mode=False)

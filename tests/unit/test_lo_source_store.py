@@ -13,7 +13,9 @@ from km.infrastructure.config.models import AccessMode, LOBinding
 from km.infrastructure.rdf.store import load_sync_manifest, store_exists
 
 
-def test_source_store_bootstrap_creates_lo_quads_db(tmp_workspace: Path, lo_package: Path) -> None:
+def test_source_store_bootstrap_creates_lo_quads_db(
+    tmp_workspace: Path, lo_package: Path
+) -> None:
     binding = LOBinding(
         ontology_id="hexagonal-architecture",
         source=str(lo_package),
@@ -22,7 +24,9 @@ def test_source_store_bootstrap_creates_lo_quads_db(tmp_workspace: Path, lo_pack
     _, lo_config = validate_lo_binding(binding, tmp_workspace)
     service = LOSourceStoreService()
 
-    entry = service.bootstrap_all([(binding, lo_config, lo_package)], km_dir=tmp_workspace / ".km")[0]
+    entry = service.bootstrap_all(
+        [(binding, lo_config, lo_package)], km_dir=tmp_workspace / ".km"
+    )[0]
 
     store_path = resolve_lo_storage_path(lo_package, lo_config.quad_store.storage_path)
     assert store_path == entry.store_path
@@ -45,12 +49,16 @@ def test_source_store_skips_rebuild_when_exports_unchanged(
     )
     _, lo_config = validate_lo_binding(binding, tmp_workspace)
     service = LOSourceStoreService()
-    first = service.bootstrap_all([(binding, lo_config, lo_package)], km_dir=tmp_workspace / ".km")[0]
+    first = service.bootstrap_all(
+        [(binding, lo_config, lo_package)], km_dir=tmp_workspace / ".km"
+    )[0]
     assert first.rebuilt is True
     service.close()
 
     service2 = LOSourceStoreService()
-    second = service2.bootstrap_all([(binding, lo_config, lo_package)], km_dir=tmp_workspace / ".km")[0]
+    second = service2.bootstrap_all(
+        [(binding, lo_config, lo_package)], km_dir=tmp_workspace / ".km"
+    )[0]
     assert second.rebuilt is False
     service2.close()
 
@@ -77,7 +85,9 @@ GRAPH <{gov_graph}> {{
     )
     _, lo_config = validate_lo_binding(binding, tmp_workspace)
     service = LOSourceStoreService()
-    entry = service.bootstrap_all([(binding, lo_config, lo_package)], km_dir=tmp_workspace / ".km")[0]
+    entry = service.bootstrap_all(
+        [(binding, lo_config, lo_package)], km_dir=tmp_workspace / ".km"
+    )[0]
     content = entry.wrapper.serialize_graph(gov_graph)
     assert "MR-HEX-001" in content
     assert "APPROVED" in content

@@ -35,7 +35,9 @@ def test_propose_rejects_read_only_binding(tmp_workspace: Path) -> None:
         app.shutdown()
 
 
-def test_propose_creates_governance_export_and_review_doc(tmp_curator_workspace: Path) -> None:
+def test_propose_creates_governance_export_and_review_doc(
+    tmp_curator_workspace: Path,
+) -> None:
     app = KMApplication.bootstrap(tmp_curator_workspace)
     try:
         cache_manifest_before = load_sync_manifest(
@@ -63,11 +65,19 @@ def test_propose_creates_governance_export_and_review_doc(tmp_curator_workspace:
         assert gov_export.is_file()
         assert "PENDING_APPROVAL" in gov_export.read_text(encoding="utf-8")
 
-        review_path = tmp_curator_workspace / ".km" / "mrs" / f"mr-hexagonal-architecture-{mr_id.removeprefix('MR-')}.md"
+        review_path = (
+            tmp_curator_workspace
+            / ".km"
+            / "mrs"
+            / f"mr-hexagonal-architecture-{mr_id.removeprefix('MR-')}.md"
+        )
         assert review_path.is_file()
         review_text = review_path.read_text(encoding="utf-8")
         assert "Approval Command:" in review_text
-        assert f"approve .km/mrs/mr-hexagonal-architecture-{mr_id.removeprefix('MR-')}.md" in review_text
+        assert (
+            f"approve .km/mrs/mr-hexagonal-architecture-{mr_id.removeprefix('MR-')}.md"
+            in review_text
+        )
         assert "Add test promotion class" in review_text
         assert "High-Level Impact" in review_text
         assert "TestPromotionClass" in review_text
@@ -126,7 +136,9 @@ def test_proposal_graph_not_in_default_query_union(tmp_curator_workspace: Path) 
         app.shutdown()
 
 
-def test_approve_merges_into_canonical_and_refreshes_cache(tmp_curator_workspace: Path) -> None:
+def test_approve_merges_into_canonical_and_refreshes_cache(
+    tmp_curator_workspace: Path,
+) -> None:
     app = KMApplication.bootstrap(tmp_curator_workspace)
     try:
         propose = mcp_tools.handle_propose_semantic_mr(
@@ -168,7 +180,10 @@ def test_approve_merges_into_canonical_and_refreshes_cache(tmp_curator_workspace
             tmp_curator_workspace / ".km" / "hexagonal-architecture_sync-manifest.json"
         )
         assert cache_manifest_after is not None
-        assert cache_manifest_after.export_checksums != cache_manifest_before.export_checksums
+        assert (
+            cache_manifest_after.export_checksums
+            != cache_manifest_before.export_checksums
+        )
 
         status = mcp_tools.handle_status(app)
         assert status["pending_mrs_count"] == 0
@@ -240,7 +255,10 @@ def test_reject_by_mr_id_minimal_path(tmp_curator_workspace: Path) -> None:
             tmp_curator_workspace / ".km" / "hexagonal-architecture_sync-manifest.json"
         )
         assert cache_manifest_after is not None
-        assert cache_manifest_after.export_checksums == cache_manifest_before.export_checksums
+        assert (
+            cache_manifest_after.export_checksums
+            == cache_manifest_before.export_checksums
+        )
 
         review_path = (
             tmp_curator_workspace
@@ -266,6 +284,8 @@ def test_approve_rejects_read_only_binding(tmp_workspace: Path) -> None:
     app = KMApplication.bootstrap(tmp_workspace)
     try:
         with pytest.raises(PermissionError, match="curator mode"):
-            mcp_tools.handle_approve_semantic_mr(app, "km://mr/hexagonal-architecture/MR-001")
+            mcp_tools.handle_approve_semantic_mr(
+                app, "km://mr/hexagonal-architecture/MR-001"
+            )
     finally:
         app.shutdown()

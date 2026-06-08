@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from pyoxigraph import NamedNode
 
 from km.application.services.lo_source_store_service import LOSourceStoreEntry
-from km.infrastructure.rdf.serialization import serialize_canonical_export, serialize_graph_block
+from km.infrastructure.rdf.serialization import (
+    serialize_canonical_export,
+    serialize_graph_block,
+)
 from km.logging_config import get_logger
 
 logger = get_logger("lo_export")

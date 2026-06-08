@@ -40,7 +40,11 @@ class QueryService:
 
         normalized = sparql.strip()
         upper = normalized.upper()
-        if not (upper.startswith("SELECT") or upper.startswith("ASK") or upper.startswith("PREFIX")):
+        if not (
+            upper.startswith("SELECT")
+            or upper.startswith("ASK")
+            or upper.startswith("PREFIX")
+        ):
             if "SELECT" not in upper and "ASK" not in upper:
                 raise KmError("Only read-only SELECT or ASK queries are supported")
 
@@ -82,9 +86,7 @@ class QueryService:
 
         case_quads = self.case_wrapper.quads_in_graph(self.git.context.graph_uri)
         for quad in case_quads:
-            wrapper.store.add(
-                Quad(quad.subject, quad.predicate, quad.object, default)
-            )
+            wrapper.store.add(Quad(quad.subject, quad.predicate, quad.object, default))
 
         for entry in self.lo_cache_entries:
             lo_wrapper = QuadStoreWrapper(entry.cache_db)

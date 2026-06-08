@@ -33,7 +33,9 @@ class LOResourceService:
     def governance_turtle(self, ontology_id: str) -> str:
         entry = self.lo_source_store.get_entry(ontology_id)
         content = entry.wrapper.serialize_graph(entry.lo_config.named_graphs.governance)
-        logger.debug("Serialized governance graph for %s from source store", ontology_id)
+        logger.debug(
+            "Serialized governance graph for %s from source store", ontology_id
+        )
         return content
 
     def _cache_entry(self, ontology_id: str):

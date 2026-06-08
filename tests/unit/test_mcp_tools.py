@@ -9,8 +9,6 @@ import pytest
 
 from km.adapters.mcp import tools as mcp_tools
 from km.application.bootstrap import KMApplication
-from km.exceptions import FeatureNotImplementedError
-from km.infrastructure.config.models import BranchMergePolicy
 from tests.fixtures_data import SAMPLE_CASE_TURTLE
 
 
@@ -109,7 +107,9 @@ def test_handle_sync_pending_branch_merges_and_resolve(tmp_workspace: Path) -> N
         app.shutdown()
 
 
-def test_sync_pending_branch_merges_already_synced_after_restart(tmp_workspace: Path) -> None:
+def test_sync_pending_branch_merges_already_synced_after_restart(
+    tmp_workspace: Path,
+) -> None:
     event_fingerprint = "persist-test"
     app = KMApplication.bootstrap(tmp_workspace)
     try:
@@ -178,6 +178,8 @@ def test_handle_propose_mr_read_only_rejected(tmp_workspace: Path) -> None:
         from km.exceptions import PermissionError
 
         with pytest.raises(PermissionError):
-            mcp_tools.handle_propose_semantic_mr(app, "hexagonal-architecture", "r", "t")
+            mcp_tools.handle_propose_semantic_mr(
+                app, "hexagonal-architecture", "r", "t"
+            )
     finally:
         app.shutdown()

@@ -47,13 +47,19 @@ def detect_parent_branch(workspace_root: Path, branch_path: str) -> str | None:
             if match and match.group(2).strip() == branch_path:
                 parent = match.group(1).strip()
                 if parent and parent != branch_path:
-                    logger.debug("Detected parent branch %s for %s via git reflog", parent, branch_path)
+                    logger.debug(
+                        "Detected parent branch %s for %s via git reflog",
+                        parent,
+                        branch_path,
+                    )
                     return parent
 
     heads_dir = workspace_root / ".git" / "refs" / "heads"
     for candidate in ("main", "master"):
         if candidate != branch_path and (heads_dir / candidate).is_file():
-            logger.debug("Falling back to parent branch %s for %s", candidate, branch_path)
+            logger.debug(
+                "Falling back to parent branch %s for %s", candidate, branch_path
+            )
             return candidate
     return None
 
@@ -72,7 +78,9 @@ def _parent_from_log_file(log_path: Path, branch_path: str) -> str | None:
     return None
 
 
-def detect_recent_merge(workspace_root: Path, target_branch: str) -> tuple[str, str] | None:
+def detect_recent_merge(
+    workspace_root: Path, target_branch: str
+) -> tuple[str, str] | None:
     """Return (source_branch, event_fingerprint) from the latest reflog merge entry."""
     log_path = _branch_log_path(workspace_root, target_branch)
     if not log_path.is_file():

@@ -5,15 +5,20 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-import pytest
 
 from km.application.services.lo_cache_service import LOCacheService
-from km.infrastructure.config.loader import load_lo_package_config, validate_lo_binding
+from km.infrastructure.config.loader import validate_lo_binding
 from km.infrastructure.config.models import AccessMode, LOBinding
-from km.infrastructure.rdf.store import compute_export_checksums, load_sync_manifest, store_exists
+from km.infrastructure.rdf.store import (
+    compute_export_checksums,
+    load_sync_manifest,
+    store_exists,
+)
 
 
-def test_first_sync_creates_cache_and_manifest(tmp_workspace: Path, lo_package: Path) -> None:
+def test_first_sync_creates_cache_and_manifest(
+    tmp_workspace: Path, lo_package: Path
+) -> None:
     binding = LOBinding(
         ontology_id="hexagonal-architecture",
         source=str(lo_package),

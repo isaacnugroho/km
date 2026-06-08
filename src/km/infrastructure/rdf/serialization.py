@@ -20,7 +20,14 @@ def _term_key(term: object) -> tuple:
 
 
 def sort_quads(quads: list[Quad]) -> list[Quad]:
-    return sorted(quads, key=lambda q: (_term_key(q.subject), _term_key(q.predicate), _term_key(q.object)))
+    return sorted(
+        quads,
+        key=lambda q: (
+            _term_key(q.subject),
+            _term_key(q.predicate),
+            _term_key(q.object),
+        ),
+    )
 
 
 def serialize_canonical_export(quads: list[Quad]) -> str:

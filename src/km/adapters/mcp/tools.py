@@ -31,7 +31,9 @@ def handle_export_case(app: KMApplication) -> dict[str, Any]:
     return {"status": "success", "export_path": str(export_path)}
 
 
-def handle_ingest_case_facts(app: KMApplication, facts: str, format: str = "json-ld") -> dict[str, Any]:
+def handle_ingest_case_facts(
+    app: KMApplication, facts: str, format: str = "json-ld"
+) -> dict[str, Any]:
     require_implemented("ingest_case_facts")
     logger.debug("ingest_case_facts format=%s", format)
     return app.case_ingest.ingest(facts, format, app.git_context)
@@ -49,7 +51,9 @@ def handle_propose_local_exception(
     rationale: str,
 ) -> dict[str, Any]:
     require_implemented("propose_local_exception")
-    return app.exceptions.propose(bypasses_shape, target_node, rationale, app.git_context)
+    return app.exceptions.propose(
+        bypasses_shape, target_node, rationale, app.git_context
+    )
 
 
 def handle_approve_local_exception(
@@ -80,14 +84,18 @@ def handle_propose_semantic_mr(
     )
 
 
-def handle_approve_semantic_mr(app: KMApplication, doc_identifier: str) -> dict[str, Any]:
+def handle_approve_semantic_mr(
+    app: KMApplication, doc_identifier: str
+) -> dict[str, Any]:
     require_implemented("approve_semantic_mr")
     result = app.merge_requests.approve(doc_identifier)
     app.shacl_cache = app.validation.shacl_cache
     return result
 
 
-def handle_reject_semantic_mr(app: KMApplication, doc_identifier: str) -> dict[str, Any]:
+def handle_reject_semantic_mr(
+    app: KMApplication, doc_identifier: str
+) -> dict[str, Any]:
     require_implemented("reject_semantic_mr")
     return app.merge_requests.reject(doc_identifier)
 

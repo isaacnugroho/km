@@ -69,8 +69,7 @@ def test_inject_lo_sparql_prefixes_declares_all_bindings() -> None:
     )
     ont = URIRef(lo_ontology_uri("hexagonal-bloc"))
     declared = {
-        str(graph.value(dec, SH.prefix))
-        for dec in graph.objects(ont, SH.declare)
+        str(graph.value(dec, SH.prefix)) for dec in graph.objects(ont, SH.declare)
     }
     assert declared == {"hex", "hexagonal_bloc", "hbloc"}
 
@@ -94,7 +93,9 @@ def test_filter_prefix_bindings_skips_invalid_and_keeps_valid() -> None:
     assert "" not in result
 
 
-def test_collect_export_prefixes_skips_base_default_prefix(tmp_path: Path, caplog) -> None:
+def test_collect_export_prefixes_skips_base_default_prefix(
+    tmp_path: Path, caplog
+) -> None:
     import logging
 
     caplog.set_level(logging.WARNING, logger="km.shacl_cache")

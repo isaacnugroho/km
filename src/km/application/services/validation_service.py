@@ -6,7 +6,6 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-from pyoxigraph import NamedNode
 from pyshacl import validate
 from rdflib import BNode, Graph, URIRef
 from rdflib.namespace import RDF, SH
@@ -72,7 +71,9 @@ class ValidationService:
         except Exception as exc:
             message = str(exc)
             if "namespace prefix" in message.lower():
-                raise KmError(f"SHACL validation failed due to prefix binding: {message}") from exc
+                raise KmError(
+                    f"SHACL validation failed due to prefix binding: {message}"
+                ) from exc
             raise
         raw_violations = _parse_violations(report_graph, self.shacl_cache.shapes_graph)
         filtered = _filter_with_exceptions(self.case_wrapper, graph_uri, raw_violations)

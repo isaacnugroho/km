@@ -64,7 +64,9 @@ def as_km_error(exc: BaseException) -> KmError | None:
     if isinstance(exc, FileNotFoundError):
         return KmError(str(exc))
     if isinstance(exc, json.JSONDecodeError):
-        return ConfigError(f"Invalid JSON: {exc.msg} at line {exc.lineno}, column {exc.colno}")
+        return ConfigError(
+            f"Invalid JSON: {exc.msg} at line {exc.lineno}, column {exc.colno}"
+        )
     if isinstance(exc, SyntaxError) and is_parser_syntax_error(exc):
         return KmError(f"Parse error: {exc.msg or exc}")
     if isinstance(exc, ValueError):

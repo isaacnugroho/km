@@ -25,7 +25,10 @@ from km.application.services.schema_service import SchemaService
 from km.application.services.status_service import StatusService, SystemStatus
 from km.application.services.validation_service import ValidationService
 from km.application.services.feature_gate import release
-from km.application.services.workspace_service import WorkspaceService, discover_workspace_root
+from km.application.services.workspace_service import (
+    WorkspaceService,
+    discover_workspace_root,
+)
 from km.infrastructure.git.context import GitContext, GitContextHolder
 from km.infrastructure.rdf.shacl_cache import ShaclCache
 from km.logging_config import get_logger
@@ -75,7 +78,9 @@ class KMApplication:
         workspace.validate_bindings()
         binding_data = list(workspace.validated_bindings)
 
-        lo_cache_base = workspace.resolve_config_path(workspace.config.lo_cache.base_path)
+        lo_cache_base = workspace.resolve_config_path(
+            workspace.config.lo_cache.base_path
+        )
         lo_cache = LOCacheService(root, lo_cache_base)
 
         lo_cache.sync_all(binding_data)
@@ -88,8 +93,12 @@ class KMApplication:
         lo_export = LOExportService()
         review_docs = MRReviewDocService(root)
 
-        case_db = workspace.resolve_config_path(workspace.config.quad_store.storage_path)
-        exports_root = workspace.resolve_config_path(workspace.config.case_exports.base_path)
+        case_db = workspace.resolve_config_path(
+            workspace.config.quad_store.storage_path
+        )
+        exports_root = workspace.resolve_config_path(
+            workspace.config.case_exports.base_path
+        )
         case_store = CaseStoreService(root, case_db, exports_root, km_dir)
         case_wrapper = case_store.bootstrap()
 
@@ -121,7 +130,9 @@ class KMApplication:
             merge_resolver,
             enable_observer=enable_git_watcher,
         )
-        case_ingest = CaseIngestService(case_wrapper, case_export, workspace.config, validation)
+        case_ingest = CaseIngestService(
+            case_wrapper, case_export, workspace.config, validation
+        )
         query = QueryService(case_wrapper, lo_cache.entries, git)
         exceptions = ExceptionService(case_wrapper, case_export, validation)
         schemas = SchemaService(lo_cache.entries)

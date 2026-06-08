@@ -42,7 +42,9 @@ def _run_tool(handler):
 @mcp.tool()
 def ingest_case_facts(facts: str, format: str = "json-ld") -> str:
     """Ingest new contextual facts into the active case branch graph."""
-    result = _run_tool(lambda: tool_handlers.handle_ingest_case_facts(_get_app(), facts, format))
+    result = _run_tool(
+        lambda: tool_handlers.handle_ingest_case_facts(_get_app(), facts, format)
+    )
     return tool_handlers.json_result(result)
 
 
@@ -61,7 +63,9 @@ def validate_constraints() -> str:
 
 
 @mcp.tool()
-def propose_local_exception(bypasses_shape: str, target_node: str, rationale: str) -> str:
+def propose_local_exception(
+    bypasses_shape: str, target_node: str, rationale: str
+) -> str:
     """Declare a local exception to bypass a SHACL shape for a focus node."""
     result = _run_tool(
         lambda: tool_handlers.handle_propose_local_exception(
@@ -85,7 +89,9 @@ def approve_local_exception(exception_id: str, approver: str, signature: str) ->
 @mcp.tool()
 def query_semantic_graph(query: str) -> str:
     """Execute a read-only SPARQL query over case + LO canonical graphs."""
-    result = _run_tool(lambda: tool_handlers.handle_query_semantic_graph(_get_app(), query))
+    result = _run_tool(
+        lambda: tool_handlers.handle_query_semantic_graph(_get_app(), query)
+    )
     return tool_handlers.json_result(result)
 
 
@@ -122,14 +128,18 @@ def export_case() -> str:
 @mcp.tool()
 def approve_semantic_mr(doc_identifier: str) -> str:
     """Approve a pending semantic merge request by review doc path or km:// URI."""
-    result = _run_tool(lambda: tool_handlers.handle_approve_semantic_mr(_get_app(), doc_identifier))
+    result = _run_tool(
+        lambda: tool_handlers.handle_approve_semantic_mr(_get_app(), doc_identifier)
+    )
     return tool_handlers.json_result(result)
 
 
 @mcp.tool()
 def reject_semantic_mr(doc_identifier: str) -> str:
     """Reject a pending semantic merge request by MR id, review doc path, or km:// URI."""
-    result = _run_tool(lambda: tool_handlers.handle_reject_semantic_mr(_get_app(), doc_identifier))
+    result = _run_tool(
+        lambda: tool_handlers.handle_reject_semantic_mr(_get_app(), doc_identifier)
+    )
     return tool_handlers.json_result(result)
 
 
@@ -158,14 +168,18 @@ def resolve_branch_merge(event_id: str, resolution: str) -> str:
     Invoke after the developer approves the approval_command from status or sync_pending_branch_merges.
     """
     result = _run_tool(
-        lambda: tool_handlers.handle_resolve_branch_merge(_get_app(), event_id, resolution)
+        lambda: tool_handlers.handle_resolve_branch_merge(
+            _get_app(), event_id, resolution
+        )
     )
     return tool_handlers.json_result(result)
 
 
 @mcp.resource("km://schemas/learning-ontologies")
 def schemas_learning_ontologies() -> str:
-    content, _ = resource_handlers.read_resource(_get_app(), "km://schemas/learning-ontologies")
+    content, _ = resource_handlers.read_resource(
+        _get_app(), "km://schemas/learning-ontologies"
+    )
     return content
 
 
@@ -177,7 +191,9 @@ def case_active_graph() -> str:
 
 @mcp.resource("km://case/active-exceptions")
 def case_active_exceptions() -> str:
-    content, _ = resource_handlers.read_resource(_get_app(), "km://case/active-exceptions")
+    content, _ = resource_handlers.read_resource(
+        _get_app(), "km://case/active-exceptions"
+    )
     return content
 
 

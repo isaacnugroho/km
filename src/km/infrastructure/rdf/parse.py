@@ -43,7 +43,9 @@ def _parse_json_ld(facts: str) -> Graph:
     return graph
 
 
-def _triples_to_quads(triples: Iterable[tuple[object, object, object]], graph_uri: str) -> list[Quad]:
+def _triples_to_quads(
+    triples: Iterable[tuple[object, object, object]], graph_uri: str
+) -> list[Quad]:
     graph_node = NamedNode(graph_uri)
     return [
         Quad(

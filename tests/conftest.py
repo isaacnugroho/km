@@ -11,7 +11,9 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-HEXAGONAL_LO = REPO_ROOT / "tests" / "fixtures" / "lo-packages" / "hexagonal-architecture"
+HEXAGONAL_LO = (
+    REPO_ROOT / "tests" / "fixtures" / "lo-packages" / "hexagonal-architecture"
+)
 LO_RUNTIME_IGNORE = shutil.ignore_patterns("lo_quads.db")
 _GIT_ENV = {
     **os.environ,
@@ -23,7 +25,9 @@ _GIT_ENV = {
 
 
 def _init_git_repo(path: Path, *, branch: str = "main") -> None:
-    subprocess.run(["git", "init", "-b", branch], cwd=path, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "init", "-b", branch], cwd=path, check=True, capture_output=True
+    )
     subprocess.run(
         ["git", "commit", "--allow-empty", "-m", "km test init"],
         cwd=path,
@@ -47,7 +51,6 @@ def tmp_workspace(tmp_path: Path, lo_package: Path) -> Path:
     _init_git_repo(ws)
     km_dir = ws / ".km"
     km_dir.mkdir()
-    rel_lo = Path("..") / "lo" / "hexagonal-architecture"
     # Use absolute path for reliability
     config = {
         "workspace_id": "test-workspace",

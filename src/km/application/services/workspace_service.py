@@ -10,7 +10,7 @@ from typing import Any
 
 from km.exceptions import KmError, WorkspaceNotFoundError
 from km.infrastructure.config.loader import load_workspace_config, validate_lo_binding
-from km.infrastructure.config.models import LOBinding, LOPackageConfig, WorkspaceConfig
+from km.infrastructure.config.models import LOBinding, LOPackageConfig
 from km.infrastructure.paths import resolve_path
 from km.logging_config import get_logger
 
@@ -65,7 +65,9 @@ class WorkspaceService:
 
         for binding in self.config.learning_ontologies:
             try:
-                source_path, lo_config = validate_lo_binding(binding, self.workspace_root)
+                source_path, lo_config = validate_lo_binding(
+                    binding, self.workspace_root
+                )
                 bindings.append(
                     {
                         "ontology_id": binding.ontology_id,

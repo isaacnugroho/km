@@ -15,9 +15,13 @@ from tests.fixtures_data import SAMPLE_CASE_TURTLE
 
 def _checkout(ws: Path, branch: str, *, create: bool = False) -> None:
     if create:
-        subprocess.run(["git", "checkout", "-b", branch], cwd=ws, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "checkout", "-b", branch], cwd=ws, check=True, capture_output=True
+        )
     else:
-        subprocess.run(["git", "checkout", branch], cwd=ws, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "checkout", branch], cwd=ws, check=True, capture_output=True
+        )
 
 
 def test_git_context_refresh_on_branch_switch(tmp_workspace: Path) -> None:
@@ -72,7 +76,9 @@ def test_auto_merge_copies_all_facts(tmp_workspace: Path) -> None:
         assert result.triples_imported >= 1
         from km.infrastructure.git.context import _context_from_branch
 
-        main_graph = app.case_ingest.serialize_active_graph(_context_from_branch("main"))
+        main_graph = app.case_ingest.serialize_active_graph(
+            _context_from_branch("main")
+        )
         assert "feature-only" in main_graph
         gov_files = list((tmp_workspace / "case-exports" / "governance").glob("*.ttl"))
         assert gov_files

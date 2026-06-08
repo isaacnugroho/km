@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from pyoxigraph import BlankNode, DefaultGraph, Literal, NamedNode, Quad, RdfFormat, Store
+from pyoxigraph import BlankNode, Literal, NamedNode, Quad, RdfFormat, Store
 
 from km.exceptions import KmError, is_parser_syntax_error, store_open_error
 from km.infrastructure.config.models import LOPackageConfig, SyncManifest
@@ -151,7 +151,9 @@ class QuadStoreWrapper:
     def load_turtle_bytes_into_graph(self, content: bytes, graph_uri: str) -> None:
         self._load_rdf_bytes(content, graph_uri)
 
-    def _load_rdf_bytes(self, content: bytes, graph_uri: str, *, source: str | None = None) -> None:
+    def _load_rdf_bytes(
+        self, content: bytes, graph_uri: str, *, source: str | None = None
+    ) -> None:
         label = source or f"graph <{graph_uri}>"
         try:
             text = content.decode("utf-8", errors="replace")
@@ -172,7 +174,9 @@ class QuadStoreWrapper:
                 self.store.load(input=content, format=TURTLE, lenient=True)
         except SyntaxError as exc:
             if is_parser_syntax_error(exc):
-                raise KmError(f"Failed to load RDF from {label}: {exc.msg or exc}") from exc
+                raise KmError(
+                    f"Failed to load RDF from {label}: {exc.msg or exc}"
+                ) from exc
             raise
         except OSError as exc:
             raise KmError(f"Failed to load RDF from {label}: {exc}") from exc
