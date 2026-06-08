@@ -11,8 +11,7 @@ from km.exceptions import KmError
 from km.infrastructure.git.context import GitContextHolder
 from km.infrastructure.rdf.store import QuadStoreWrapper
 from km.logging_config import get_logger
-from rdflib import BNode, Graph, Literal as RDFLiteral, URIRef
-from rdflib.query import Result
+from pyoxigraph import DefaultGraph, Quad
 
 logger = get_logger("query")
 
@@ -21,6 +20,7 @@ READONLY_FORBIDDEN = re.compile(
     re.IGNORECASE,
 )
 MR_GRAPH_PATTERN = re.compile(r"GRAPH\s*<[^>]+/mr/[^>]+>", re.IGNORECASE)
+_ASK_QUERY = re.compile(r"^\s*ASK\b", re.IGNORECASE | re.DOTALL)
 
 
 class QueryService:
@@ -53,10 +53,19 @@ class QueryService:
 
         start = time.perf_counter()
         dataset = self._build_dataset()
-        result = dataset.query(normalized)
-        elapsed_ms = (time.perf_counter() - start) * 1000
+        try:
+            if _is_ask_query(normalized):
+                payload = {
+                    "head": {},
+                    "results": {"boolean": dataset.ask(normalized)},
+                }
+            else:
+                rows = dataset.query(normalized)
+                payload = _rows_to_sparql_json(rows)
+        finally:
+            dataset.close()
 
-        payload = _result_to_sparql_json(result, normalized)
+        elapsed_ms = (time.perf_counter() - start) * 1000
         bindings = payload.get("results", {}).get("bindings", [])
         if len(bindings) > 10_000:
             logger.warning("Large query result: %d bindings", len(bindings))
@@ -67,17 +76,25 @@ class QueryService:
 
         return payload
 
-    def _build_dataset(self) -> Graph:
-        merged = Graph()
+    def _build_dataset(self) -> QuadStoreWrapper:
+        wrapper = QuadStoreWrapper.in_memory()
+        default = DefaultGraph()
+
         case_quads = self.case_wrapper.quads_in_graph(self.git.context.graph_uri)
-        _add_quads_to_graph(merged, case_quads)
+        for quad in case_quads:
+            wrapper.store.add(
+                Quad(quad.subject, quad.predicate, quad.object, default)
+            )
 
         for entry in self.lo_cache_entries:
             lo_wrapper = QuadStoreWrapper(entry.cache_db)
             try:
                 canonical_uri = entry.lo_config.named_graphs.canonical
                 lo_quads = lo_wrapper.quads_in_graph(canonical_uri)
-                _add_quads_to_graph(merged, lo_quads)
+                for quad in lo_quads:
+                    wrapper.store.add(
+                        Quad(quad.subject, quad.predicate, quad.object, default)
+                    )
             finally:
                 lo_wrapper.close()
 
@@ -85,21 +102,36 @@ class QueryService:
             e.lo_config.named_graphs.canonical for e in self.lo_cache_entries
         ]
         logger.debug("Query dataset graphs: %s", graph_uris)
-        return merged
+        return wrapper
 
 
-def _add_quads_to_graph(target: Graph, quads: list) -> None:
-    from rdflib import BNode, Literal as RDFLiteral, URIRef
-    from pyoxigraph import BlankNode, Literal, NamedNode
+def _is_ask_query(sparql: str) -> bool:
+    stripped = re.sub(
+        r"PREFIX\s+[\w-]+:\s*<[^>]+>\s*",
+        "",
+        sparql,
+        flags=re.IGNORECASE,
+    ).strip()
+    return bool(_ASK_QUERY.match(stripped))
 
-    for quad in quads:
-        s = _oxi_to_rdflib(quad.subject)
-        p = URIRef(quad.predicate.value)
-        o = _oxi_to_rdflib(quad.object)
-        target.add((s, p, o))
+
+def _rows_to_sparql_json(rows: list[dict[str, str | None]]) -> dict[str, Any]:
+    if not rows:
+        return {"head": {"vars": []}, "results": {"bindings": []}}
+    vars_list = list(rows[0].keys())
+    bindings = []
+    for row in rows:
+        binding: dict[str, dict[str, str]] = {}
+        for var in vars_list:
+            value = row.get(var)
+            if value is None:
+                continue
+            binding[var] = _string_to_binding(value)
+        bindings.append(binding)
+    return {"head": {"vars": vars_list}, "results": {"bindings": bindings}}
 
 
-def _oxi_to_rdflib(term: object) -> URIRef | BNode | RDFLiteral:
+def _oxi_to_rdflib(term: object):
     from rdflib import BNode, Literal as RDFLiteral, URIRef
     from pyoxigraph import BlankNode, Literal, NamedNode
 
@@ -116,36 +148,9 @@ def _oxi_to_rdflib(term: object) -> URIRef | BNode | RDFLiteral:
     return RDFLiteral(str(term))
 
 
-def _result_to_sparql_json(result: Result, query: str) -> dict[str, Any]:
-    if result.type == "ASK":
-        return {"head": {}, "results": {"boolean": bool(result.askAnswer)}}
-
-    vars_list = [str(v) for v in result.vars]
-    bindings = []
-    for row in result:
-        binding: dict[str, dict[str, str]] = {}
-        for var in result.vars:
-            term = row[var]
-            if term is None:
-                continue
-            binding[str(var)] = _term_to_binding(term)
-        bindings.append(binding)
-
-    return {"head": {"vars": vars_list}, "results": {"bindings": bindings}}
-
-
-def _term_to_binding(term: object) -> dict[str, str]:
-    from rdflib import BNode, Literal as RDFLiteral, URIRef
-
-    if isinstance(term, URIRef):
-        return {"type": "uri", "value": str(term)}
-    if isinstance(term, BNode):
-        return {"type": "bnode", "value": str(term)}
-    if isinstance(term, RDFLiteral):
-        value: dict[str, str] = {"type": "literal", "value": str(term)}
-        if term.language:
-            value["xml:lang"] = term.language
-        elif term.datatype:
-            value["datatype"] = str(term.datatype)
-        return value
-    return {"type": "literal", "value": str(term)}
+def _string_to_binding(value: str) -> dict[str, str]:
+    if value.startswith("http://") or value.startswith("https://"):
+        return {"type": "uri", "value": value}
+    if value.startswith("_:"):
+        return {"type": "bnode", "value": value}
+    return {"type": "literal", "value": value}

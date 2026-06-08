@@ -8,7 +8,13 @@ from pathlib import Path
 from typing import Any
 
 from km.infrastructure.git.context import GitContext
-from km.infrastructure.rdf.ref_mapping import ref_to_branch_slug, ref_to_export_filename
+from km.infrastructure.rdf.ref_mapping import (
+    export_filename_to_git_ref,
+    export_filename_to_graph_uri,
+    graph_uri_to_branch_slug,
+    ref_to_branch_slug,
+    ref_to_export_filename,
+)
 from km.infrastructure.rdf.store import QuadStoreWrapper, remove_store, sha256_file
 from km.infrastructure.sync_manifest import (
     case_branch_sync_manifest_path,
@@ -92,20 +98,6 @@ def _governance_manifest_matches(exports_root: Path, manifest_path: Path) -> boo
     return stored == current
 
 
-def _graph_filename_to_git_ref(filename: str) -> str | None:
-    """Best-effort inverse of ``ref_to_export_filename``."""
-    if not filename.endswith(".ttl"):
-        return None
-    stem = filename[: -len(".ttl")]
-    if stem.startswith("refs-heads-"):
-        branch_segment = stem[len("refs-heads-") :]
-        return f"refs/heads/{branch_segment.replace('-', '/')}"
-    if stem.startswith("refs-"):
-        remainder = stem[len("refs-") :]
-        return f"refs/{remainder.replace('-', '/')}"
-    return None
-
-
 def case_exports_need_rebuild(
     case_db_path: Path,
     exports_root: Path,
@@ -121,7 +113,7 @@ def case_exports_need_rebuild(
         return False
 
     for graph_path in sorted(graphs_dir.glob("*.ttl")):
-        git_ref = _graph_filename_to_git_ref(graph_path.name)
+        git_ref = export_filename_to_git_ref(graph_path.name)
         if git_ref is None:
             return True
         manifest_path = case_branch_sync_manifest_path(km_dir, git_ref)
@@ -154,11 +146,21 @@ class CaseExportService:
         wrapper = QuadStoreWrapper(case_db_path)
         try:
             for ttl in sorted(graphs_dir.glob("*.ttl")):
-                logger.debug("Importing case export %s", ttl.name)
-                wrapper.load_turtle_into_graph(ttl, "")
+                content = ttl.read_bytes()
+                graph_uri = export_filename_to_graph_uri(ttl.name) or ""
+                if graph_uri:
+                    logger.debug(
+                        "Importing case export %s → graph %s (slug %s)",
+                        ttl.name,
+                        graph_uri,
+                        graph_uri_to_branch_slug(graph_uri),
+                    )
+                else:
+                    logger.debug("Importing case export %s", ttl.name)
+                wrapper.load_turtle_bytes_into_graph(content, graph_uri)
             for ttl in sorted(governance_dir.glob("*.ttl")):
                 logger.debug("Importing case governance export %s", ttl.name)
-                wrapper.load_turtle_into_graph(ttl, "")
+                wrapper.load_turtle_bytes_into_graph(ttl.read_bytes(), "")
         finally:
             wrapper.close()
 

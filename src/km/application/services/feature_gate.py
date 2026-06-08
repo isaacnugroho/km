@@ -6,6 +6,7 @@ from km.exceptions import FeatureNotImplementedError
 
 FEATURES: dict[str, bool] = {
     "status": True,
+    "validate_bindings": True,
     "export_case": True,
     "ingest_case_facts": True,
     "validate_constraints": True,
@@ -14,6 +15,7 @@ FEATURES: dict[str, bool] = {
     "query_semantic_graph": True,
     "propose_semantic_mr": True,
     "approve_semantic_mr": True,
+    "reject_semantic_mr": True,
     "sync_pending_branch_merges": True,
     "resolve_branch_merge": True,
     "resource:schemas/learning-ontologies": True,

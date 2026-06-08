@@ -6,11 +6,12 @@ import hashlib
 import json
 import re
 import shutil
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from pyoxigraph import BlankNode, Literal, NamedNode, Quad, RdfFormat, Store
+from pyoxigraph import BlankNode, DefaultGraph, Literal, NamedNode, Quad, RdfFormat, Store
 
 from km.exceptions import KmError, is_parser_syntax_error, store_open_error
 from km.infrastructure.config.models import LOPackageConfig, SyncManifest
@@ -125,13 +126,20 @@ def import_lo_exports_to_store(
 class QuadStoreWrapper:
     """Thin wrapper around pyoxigraph Store."""
 
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, *, ephemeral: bool = False) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         self.path = path
+        self._ephemeral = ephemeral
         try:
             self.store = Store(str(path))
         except OSError as exc:
             raise store_open_error(path, exc) from exc
+
+    @classmethod
+    def in_memory(cls) -> QuadStoreWrapper:
+        """Ephemeral on-disk store for merged SPARQL query datasets."""
+        path = Path(tempfile.mkdtemp(prefix="km-query-"))
+        return cls(path, ephemeral=True)
 
     def clear(self) -> None:
         self.store.clear()
@@ -236,6 +244,8 @@ class QuadStoreWrapper:
 
     def close(self) -> None:
         del self.store
+        if self._ephemeral:
+            remove_store(self.path)
 
 
 def _term_to_str(term: object) -> str | None:

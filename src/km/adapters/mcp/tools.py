@@ -20,6 +20,11 @@ def handle_status(app: KMApplication) -> dict[str, Any]:
     return status.to_dict()
 
 
+def handle_validate_bindings(app: KMApplication) -> dict[str, Any]:
+    require_implemented("validate_bindings")
+    return app.workspace.binding_report()
+
+
 def handle_export_case(app: KMApplication) -> dict[str, Any]:
     require_implemented("export_case")
     export_path = app.case_export.export_active(app.git_context)
@@ -80,6 +85,11 @@ def handle_approve_semantic_mr(app: KMApplication, doc_identifier: str) -> dict[
     result = app.merge_requests.approve(doc_identifier)
     app.shacl_cache = app.validation.shacl_cache
     return result
+
+
+def handle_reject_semantic_mr(app: KMApplication, doc_identifier: str) -> dict[str, Any]:
+    require_implemented("reject_semantic_mr")
+    return app.merge_requests.reject(doc_identifier)
 
 
 def handle_sync_pending_branch_merges(

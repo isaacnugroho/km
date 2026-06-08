@@ -50,3 +50,18 @@ def export_filename_to_graph_uri(filename: str) -> str | None:
         return None
     branch_segment = stem[len("refs-heads-") :]
     return branch_path_to_graph_uri(branch_segment)
+
+
+def export_filename_to_git_ref(filename: str) -> str | None:
+    """Best-effort inverse of ``ref_to_export_filename``."""
+    graph_uri = export_filename_to_graph_uri(filename)
+    if graph_uri is not None:
+        slug = graph_uri_to_branch_slug(graph_uri)
+        return f"refs/heads/{slug.replace('-', '/')}"
+    if not filename.endswith(".ttl"):
+        return None
+    stem = filename[: -len(".ttl")]
+    if stem.startswith("refs-"):
+        remainder = stem[len("refs-") :]
+        return f"refs/{remainder.replace('-', '/')}"
+    return None

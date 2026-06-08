@@ -49,6 +49,8 @@ def configure_logging(
 
     if mcp_mode:
         _ensure_no_stdout_handlers(root)
+        if has_stdout_handler():
+            raise RuntimeError("KM logging must not attach handlers to stdout in MCP mode")
 
 
 def _ensure_no_stdout_handlers(logger: logging.Logger) -> None:

@@ -13,6 +13,7 @@ from tests.fixtures_data import SAMPLE_CASE_TURTLE
 
 EXPECTED_TOOLS = {
     "ingest_case_facts",
+    "validate_bindings",
     "validate_constraints",
     "propose_local_exception",
     "approve_local_exception",
@@ -21,6 +22,7 @@ EXPECTED_TOOLS = {
     "status",
     "export_case",
     "approve_semantic_mr",
+    "reject_semantic_mr",
     "sync_pending_branch_merges",
     "resolve_branch_merge",
 }

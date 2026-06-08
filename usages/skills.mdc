@@ -7,7 +7,7 @@ alwaysApply: true
 
 Reusable recipes for Knowledge Management MCP operations. Execute these during development in KM-governed workspaces.
 
-**MCP tools (agent):** `status`, `validate_constraints`, `ingest_case_facts`, `query_semantic_graph`, `propose_local_exception`, `approve_local_exception`, `propose_semantic_mr`, `approve_semantic_mr`, `sync_pending_branch_merges`, `resolve_branch_merge`, `export_case`.
+**MCP tools (agent):** `status`, `validate_bindings`, `validate_constraints`, `ingest_case_facts`, `query_semantic_graph`, `propose_local_exception`, `approve_local_exception`, `propose_semantic_mr`, `approve_semantic_mr`, `reject_semantic_mr`, `sync_pending_branch_merges`, `resolve_branch_merge`, `export_case`.
 
 **CLI (human / no MCP):** `km init`, `km status`, `km mcp`, `km export-case` only. There is no `km validate` — use MCP **`validate_constraints`**.
 
@@ -61,16 +61,25 @@ local:useCanvasDrag a react:HighFrequencyEventHook ;
 
 Approved exceptions are branch-scoped; `auto_merge_exception` policy copies them on Git merge (see spec §5.3).
 
+## Skill 0: LO Binding Validation
+
+**When:** Task start, after developer edits `.km/config.json`, or when `status` shows missing/stale LO bindings.
+
+1. **`validate_bindings`** — returns `{ valid, bindings[], errors[] }` per ontology.
+2. If `valid: false`, report `errors[]` and pause (do not hand-edit config).
+3. **Not** a substitute for **`validate_constraints`** (SHACL).
+
 ## Skill 4: Semantic MR Promotion
 
 **When:** A local structural pattern should evolve shared organizational knowledge (curator binding required).
 
 1. Draft Turtle `diff_insertions` and `diff_deletions`.
 2. **`propose_semantic_mr`** (`target_ontology`, `rationale`, diffs).
-3. Review doc materializes at `.km/mrs/mr-{id}.md` — prompt developer:
-   `approve .km/mrs/mr-{ontology}-{id}.md`
-4. **`approve_semantic_mr`** with `doc_identifier` when developer approves.
-5. On `APPROVED`: **`status`** — confirm `.km/lo-cache/` rebuilt and canonical cache reloaded.
+3. Review doc materializes at `.km/mrs/mr-{id}.md` with **High-Level Impact** bullets, plus:
+   - **Approval Command:** `approve .km/mrs/mr-{ontology}-{id}.md`
+   - **Reject Command:** `reject MR-{id}` (or review doc path / `km://mr/...`)
+4. On developer `approve ...` → **`approve_semantic_mr`** with `doc_identifier` → **`status`** to confirm `.km/lo-cache/` rebuilt.
+5. On developer `reject MR-{id}` → **`reject_semantic_mr`** → confirm review doc `REJECTED`; **no** canonical merge or LO cache rebuild.
 
 ## Skill 5: Branch Case Merge Resolution
 

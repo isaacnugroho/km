@@ -11,10 +11,10 @@ You manage formal semantics alongside code. Every structural code change must be
 
 Two surfaces exist. Do not pattern-match CLI names to invent MCP tools or undocumented shell commands.
 
-| Surface                          | Purpose                      | Allowed                                                                                                                                                                                                                                                |
-| :------------------------------- | :--------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **MCP tools** (agent KM work)    | All semantic operations      | `status`, `validate_constraints`, `ingest_case_facts`, `query_semantic_graph`, `propose_local_exception`, `approve_local_exception`, `propose_semantic_mr`, `approve_semantic_mr`, `sync_pending_branch_merges`, `resolve_branch_merge`, `export_case` |
-| **`km` CLI** (shell, human-only) | Bootstrap / inspect / export | `init`, `status`, `mcp`, `export-case` only                                                                                                                                                                                                            |
+| Surface                          | Purpose                      | Allowed                                                                                                                                                                                                                                                                                           |
+| :------------------------------- | :--------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **MCP tools** (agent KM work)    | All semantic operations      | `status`, `validate_bindings`, `validate_constraints`, `ingest_case_facts`, `query_semantic_graph`, `propose_local_exception`, `approve_local_exception`, `propose_semantic_mr`, `approve_semantic_mr`, `reject_semantic_mr`, `sync_pending_branch_merges`, `resolve_branch_merge`, `export_case` |
+| **`km` CLI** (shell, human-only) | Bootstrap / inspect / export | `init`, `status`, `mcp`, `export-case` only                                                                                                                                                                                                                                                       |
 
 - Agent KM operations **MUST** use MCP tools — never shell `km …` except when the user explicitly asks (`km init`, or human diagnostics).
 - There is **no** `km validate`. Validation is MCP-only: **`validate_constraints`**.
@@ -45,8 +45,9 @@ Two surfaces exist. Do not pattern-match CLI names to invent MCP tools or undocu
 Before writing code or proposing plans:
 
 1. **`status`** — active Git branch, `branch_merge_policy`, `pending_branch_merges`, loaded LO bindings (ontology_id, source, mode, cache sync).
-2. **`km://schemas/learning-ontologies`** — available classes, properties, constraint boundaries (canonical graphs only).
-3. **`km://case/active-graph`** or **`query_semantic_graph`** — existing branch facts.
+2. **`validate_bindings`** (optional) — when LO bindings look stale or misconfigured; per-binding errors without hand-editing config.
+3. **`km://schemas/learning-ontologies`** — available classes, properties, constraint boundaries (canonical graphs only).
+4. **`km://case/active-graph`** or **`query_semantic_graph`** — existing branch facts.
 
 ## Phase 2 — Fact Discovery & Ingestion (during development)
 
@@ -105,9 +106,10 @@ Use compact SPARQL instead of recursive directory search to locate patterns and 
 When a local pattern should become global LO policy:
 
 1. **`propose_semantic_mr`** with `diff_insertions` / `diff_deletions` (target binding needs `mode: "curator"`).
-2. Prompt developer: `approve .km/mrs/mr-{ontology}-{id}.md`
-3. **`approve_semantic_mr`** with `doc_identifier` when developer approves.
-4. **`status`** — confirm LO cache refreshed.
+2. Prompt developer with review doc commands: `approve .km/mrs/mr-{ontology}-{id}.md` or `reject MR-{id}`.
+3. **`approve_semantic_mr`** when developer approves — merges into canonical, rebuilds LO cache.
+4. **`reject_semantic_mr`** when developer rejects — governance shard + review doc only; **no** cache rebuild.
+5. **`status`** — on approve, confirm LO cache refreshed; on reject, confirm `pending_mrs_count` decreased.
 
 ### Branch Case merge (after Git merge into main/master)
 

@@ -24,6 +24,7 @@ from km.application.services.query_service import QueryService
 from km.application.services.schema_service import SchemaService
 from km.application.services.status_service import StatusService, SystemStatus
 from km.application.services.validation_service import ValidationService
+from km.application.services.feature_gate import release
 from km.application.services.workspace_service import WorkspaceService, discover_workspace_root
 from km.infrastructure.git.context import GitContext, GitContextHolder
 from km.infrastructure.rdf.shacl_cache import ShaclCache
@@ -72,16 +73,10 @@ class KMApplication:
 
         workspace = WorkspaceService(root)
         workspace.validate_bindings()
+        binding_data = list(workspace.validated_bindings)
 
         lo_cache_base = workspace.resolve_config_path(workspace.config.lo_cache.base_path)
         lo_cache = LOCacheService(root, lo_cache_base)
-
-        binding_data = []
-        for binding in workspace.config.learning_ontologies:
-            from km.infrastructure.config.loader import validate_lo_binding
-
-            source_path, lo_config = validate_lo_binding(binding, root)
-            binding_data.append((binding, lo_config, source_path))
 
         lo_cache.sync_all(binding_data)
         shacl_cache = ShaclCache.compile_from_lo_entries(lo_cache.entries)
@@ -156,6 +151,8 @@ class KMApplication:
         )
         branch_inheritance.ensure_inherited(git, root)
         git_watcher.start()
+        release("validate_bindings")
+        release("reject_semantic_mr")
         logger.info("KM bootstrap complete")
         return app
 

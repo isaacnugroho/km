@@ -47,6 +47,13 @@ def ingest_case_facts(facts: str, format: str = "json-ld") -> str:
 
 
 @mcp.tool()
+def validate_bindings() -> str:
+    """Validate workspace learning-ontology bindings and return per-binding status."""
+    result = _run_tool(lambda: tool_handlers.handle_validate_bindings(_get_app()))
+    return tool_handlers.json_result(result)
+
+
+@mcp.tool()
 def validate_constraints() -> str:
     """Run SHACL validation on the active case graph against LO canonical shapes."""
     result = _run_tool(lambda: tool_handlers.handle_validate_constraints(_get_app()))
@@ -116,6 +123,13 @@ def export_case() -> str:
 def approve_semantic_mr(doc_identifier: str) -> str:
     """Approve a pending semantic merge request by review doc path or km:// URI."""
     result = _run_tool(lambda: tool_handlers.handle_approve_semantic_mr(_get_app(), doc_identifier))
+    return tool_handlers.json_result(result)
+
+
+@mcp.tool()
+def reject_semantic_mr(doc_identifier: str) -> str:
+    """Reject a pending semantic merge request by MR id, review doc path, or km:// URI."""
+    result = _run_tool(lambda: tool_handlers.handle_reject_semantic_mr(_get_app(), doc_identifier))
     return tool_handlers.json_result(result)
 
 

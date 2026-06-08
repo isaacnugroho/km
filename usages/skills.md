@@ -2,7 +2,7 @@
 
 This document defines reusable, step-by-step workspace recipes ("skills") that agents and developer daemons can execute to automate Knowledge Management operations.
 
-**MCP tools (agent):** `status`, `validate_constraints`, `ingest_case_facts`, `query_semantic_graph`, `propose_local_exception`, `approve_local_exception`, `propose_semantic_mr`, `approve_semantic_mr`, `sync_pending_branch_merges`, `resolve_branch_merge`, `export_case`.
+**MCP tools (agent):** `status`, `validate_bindings`, `validate_constraints`, `ingest_case_facts`, `query_semantic_graph`, `propose_local_exception`, `approve_local_exception`, `propose_semantic_mr`, `approve_semantic_mr`, `reject_semantic_mr`, `sync_pending_branch_merges`, `resolve_branch_merge`, `export_case`.
 
 **CLI (human / no MCP):** `km init`, `km status`, `km mcp`, `km export-case` only. There is **no** `km validate` — use MCP **`validate_constraints`**.
 
@@ -124,6 +124,16 @@ sequenceDiagram
 
 ---
 
+## Skill 0: LO Binding Validation
+
+**When:** Task start, after developer edits `.km/config.json`, or when `status` shows missing/stale LO bindings.
+
+1. **`validate_bindings`** — returns `{ valid, bindings[], errors[] }` per ontology.
+2. If `valid: false`, report `errors[]` and pause (do not hand-edit config).
+3. **Not** a substitute for **`validate_constraints`** (SHACL).
+
+---
+
 ## Skill 4: Semantic MR Promotion (Evolution)
 
 **Purpose:** Promote a localized structural pattern to the global static Learning Ontologies to evolve the shared organizational knowledge base.
@@ -141,12 +151,19 @@ sequenceDiagram
     MCP->>LO: Upsert exports/governance/MR-042.ttl
     MCP->>MCP: Generate derived review doc .km/mrs/mr-042.md
     MCP-->>Agent: { mr_id, status: PENDING_APPROVAL }
-    Agent->>Human: Prompts: approve .km/mrs/mr-042.md
-    Human->>Agent: approve .km/mrs/mr-042.md
-    Agent->>MCP: approve_semantic_mr(doc_identifier)
-    MCP->>LO: Merge proposal → canonical; regenerate exports/
-    MCP->>Cache: Full cache rebuild
-    MCP-->>Agent: { status: APPROVED, mr_id, target_ontology, timestamp }
+    Agent->>Human: Prompts: approve or reject MR-042
+    alt approve
+        Human->>Agent: approve .km/mrs/mr-042.md
+        Agent->>MCP: approve_semantic_mr(doc_identifier)
+        MCP->>LO: Merge proposal → canonical; regenerate exports/
+        MCP->>Cache: Full cache rebuild
+        MCP-->>Agent: { status: APPROVED, mr_id, target_ontology, timestamp }
+    else reject
+        Human->>Agent: reject MR-042
+        Agent->>MCP: reject_semantic_mr(doc_identifier)
+        MCP->>LO: Update governance shard only
+        MCP-->>Agent: { status: REJECTED, mr_id, timestamp }
+    end
     Agent->>MCP: status()
 ```
 
@@ -157,7 +174,8 @@ sequenceDiagram
 2.  **Submit Propose Command:** Call `propose_semantic_mr`. Requires `mode: "curator"` on the target binding. The server writes proposal quads to the **source** LO package's `mr/{mr-id}` graph and MR metadata to the source governance graph.
 3.  **Review Document (Derived):** The system generates a markdown review document at `.km/mrs/mr-<mr-id>.md` from governance triples, containing:
     *   Human-readable metadata.
-    *   The `approve <doc name>` command path (the agent will call `approve_semantic_mr` when the developer runs it).
+    *   **High-Level Impact** bullets (classes, SHACL shapes, predicates parsed from the diff).
+    *   **Approval Command:** `approve <doc name>` and **Reject Command:** `reject MR-{id}`.
     *   A structured summary of engineering rationale.
     *   Standard `diff` blocks against `exports/main.ttl` containing the Turtle serialization edits.
 4.  **Instruct the Human:**
@@ -165,9 +183,10 @@ sequenceDiagram
     > **Semantic Knowledge Promotion Submitted!**
     > A new semantic Merge Request has been materialized at `.km/mrs/mr-react-conventions-042.md`.
     > 
-    > Please review the changes and run the following command to finalize:
+    > Please review the changes and run one of:
     > ```
     > approve .km/mrs/mr-react-conventions-042.md
+    > reject MR-REACT_CONVENTIONS-042
     > ```
 5.  **Apply Approval:** When the developer submits the approval command, invoke `approve_semantic_mr`:
     ```python
@@ -176,7 +195,8 @@ sequenceDiagram
         {"doc_identifier": ".km/mrs/mr-react-conventions-042.md"},
     )
     ```
-6.  **Reload Memory System:** On `{ "status": "APPROVED" }`, invoke `status` to confirm the workspace LO cache (`.km/lo-cache/`) is refreshed from source exports and the in-memory canonical cache is reloaded.
+6.  **Apply Rejection:** When the developer submits `reject MR-{id}`, invoke `reject_semantic_mr` — governance shard and review doc only; no canonical merge or cache rebuild.
+7.  **Reload Memory System:** On `{ "status": "APPROVED" }`, invoke `status` to confirm the workspace LO cache (`.km/lo-cache/`) is refreshed. On `REJECTED`, confirm `pending_mrs_count` decreased.
 
 ---
 

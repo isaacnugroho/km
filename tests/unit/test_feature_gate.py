@@ -40,6 +40,8 @@ def test_phase4b_mr_propose_implemented() -> None:
 
 def test_phase4c_mr_approve_implemented() -> None:
     require_implemented("approve_semantic_mr")
+    require_implemented("reject_semantic_mr")
+    require_implemented("validate_bindings")
 
 
 def test_phase5_features_implemented() -> None:

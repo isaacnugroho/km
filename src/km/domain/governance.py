@@ -19,6 +19,8 @@ KM_REVIEW_DOC = f"{KM}reviewDoc"
 KM_DIFF_DELETIONS = f"{KM}diffDeletions"
 KM_APPROVER = f"{KM}approver"
 KM_APPROVED_AT = f"{KM}approvedAt"
+KM_REJECTOR = f"{KM}rejector"
+KM_REJECTED_AT = f"{KM}rejectedAt"
 
 KM_BRANCH_MERGE_RESOLUTION = f"{KM}BranchMergeResolution"
 KM_SOURCE_GRAPH = f"{KM}sourceGraph"

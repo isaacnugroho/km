@@ -164,7 +164,9 @@ class ShaclCache:
                 quads = wrapper.quads_in_graph(canonical_uri)
                 lo_graph = _quads_to_rdflib(quads)
                 primary_ns = entry.lo_config.namespace_uri
-                primary_prefix = entry.lo_config.primary_prefix
+                primary_prefix = entry.lo_config.prefix or lo_prefix_name(
+                    entry.binding.ontology_id
+                )
                 lo_prefixes = collect_export_prefixes(entry.source_path)
                 lo_prefixes[primary_prefix] = primary_ns
                 lo_prefixes = filter_prefix_bindings(lo_prefixes)
@@ -177,7 +179,7 @@ class ShaclCache:
                     merged.add(triple)
                 inject_lo_sparql_prefixes(
                     merged,
-                    entry.lo_config.base_uri,
+                    lo_ontology_uri(entry.binding.ontology_id),
                     lo_prefixes,
                 )
 

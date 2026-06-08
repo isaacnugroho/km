@@ -18,10 +18,10 @@ Every structural change you make to the symbolic layer must be reflected, verifi
 
 Two surfaces exist. Do not pattern-match CLI names to invent MCP tools or undocumented shell commands.
 
-| Surface                          | Purpose                      | Allowed                                                                                                                                                                                                                                                |
-| :------------------------------- | :--------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **MCP tools** (agent KM work)    | All semantic operations      | `status`, `validate_constraints`, `ingest_case_facts`, `query_semantic_graph`, `propose_local_exception`, `approve_local_exception`, `propose_semantic_mr`, `approve_semantic_mr`, `sync_pending_branch_merges`, `resolve_branch_merge`, `export_case` |
-| **`km` CLI** (shell, human-only) | Bootstrap / inspect / export | `init`, `status`, `mcp`, `export-case` only                                                                                                                                                                                                            |
+| Surface                          | Purpose                      | Allowed                                                                                                                                                                                                                                                                                           |
+| :------------------------------- | :--------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **MCP tools** (agent KM work)    | All semantic operations      | `status`, `validate_bindings`, `validate_constraints`, `ingest_case_facts`, `query_semantic_graph`, `propose_local_exception`, `approve_local_exception`, `propose_semantic_mr`, `approve_semantic_mr`, `reject_semantic_mr`, `sync_pending_branch_merges`, `resolve_branch_merge`, `export_case` |
+| **`km` CLI** (shell, human-only) | Bootstrap / inspect / export | `init`, `status`, `mcp`, `export-case` only                                                                                                                                                                                                                                                       |
 
 **Rules:**
 
@@ -107,17 +107,18 @@ See **§2 MCP tool errors (infrastructure)** when the tool itself fails (not a `
 
 ### MCP / CLI surface alignment
 
-| Capability                     | CLI              | MCP tool                                             |
-| :----------------------------- | :--------------- | :--------------------------------------------------- |
-| Workspace status               | `km status`      | `status`                                             |
-| SHACL validation               | —                | `validate_constraints`                               |
-| Fact ingestion                 | —                | `ingest_case_facts`                                  |
-| SPARQL query                   | —                | `query_semantic_graph`                               |
-| Local exceptions               | —                | `propose_local_exception`, `approve_local_exception` |
-| Semantic MR                    | —                | `propose_semantic_mr`, `approve_semantic_mr`         |
-| Export active branch graph     | `km export-case` | `export_case`                                        |
-| Branch merge sync (idempotent) | —                | `sync_pending_branch_merges`                         |
-| Branch merge resolve           | —                | `resolve_branch_merge`                               |
+| Capability                     | CLI              | MCP tool                                                           |
+| :----------------------------- | :--------------- | :----------------------------------------------------------------- |
+| Workspace status               | `km status`      | `status`                                                           |
+| SHACL validation               | —                | `validate_constraints`                                             |
+| Fact ingestion                 | —                | `ingest_case_facts`                                                |
+| SPARQL query                   | —                | `query_semantic_graph`                                             |
+| Local exceptions               | —                | `propose_local_exception`, `approve_local_exception`               |
+| LO binding validation          | —                | `validate_bindings`                                                |
+| Semantic MR                    | —                | `propose_semantic_mr`, `approve_semantic_mr`, `reject_semantic_mr` |
+| Export active branch graph     | `km export-case` | `export_case`                                                      |
+| Branch merge sync (idempotent) | —                | `sync_pending_branch_merges`                                       |
+| Branch merge resolve           | —                | `resolve_branch_merge`                                             |
 
 MCP-only capabilities have **no** CLI mirror. Do not invent one.
 
@@ -218,7 +219,7 @@ When a local pattern or structural extension proves to be globally useful, promo
 1.  **Draft Diff:** Assemble standard Turtle insertions and deletions (`diff_insertions` and `diff_deletions`).
 2.  **Submit MR:** Invoke `propose_semantic_mr` passing the target ontology and structural rationale. Requires `mode: "curator"` on the target binding. Proposal quads are written to the **source** LO package; a derived review document is generated in `.km/mrs/`.
 3.  **Review File (Derived):** The system generates a markdown review file under `.km/mrs/` from governance triples (or exposes it as `km://mr/{ontology-id}/{mr-id}`).
-4.  **Await Approval:** Stop your autonomous loop and request the developer to run `approve <mr-file-path>` (e.g., `approve .km/mrs/mr-react-conventions-042.md`).
+4.  **Await Decision:** Stop your autonomous loop and request the developer to run `approve <mr-file-path>` or `reject MR-{id}`.
 5.  **Apply Approval:** When the developer submits the approval command, parse the `doc_identifier` and invoke `approve_semantic_mr`:
     ```python
     mcp_client.call_tool(
@@ -226,7 +227,8 @@ When a local pattern or structural extension proves to be globally useful, promo
         {"doc_identifier": ".km/mrs/mr-react-conventions-042.md"},
     )
     ```
-6.  **Re-align:** On `{ "status": "APPROVED" }`, invoke `status` to confirm the workspace LO cache is refreshed and the canonical graph cache is synchronized.
+6.  **Apply Rejection:** When the developer submits `reject MR-{id}`, invoke `reject_semantic_mr` with the MR id (or doc path / `km://mr/...`). Response `{ "status": "REJECTED" }` — no canonical merge or LO cache rebuild.
+7.  **Re-align:** On `{ "status": "APPROVED" }`, invoke `status` to confirm the workspace LO cache is refreshed. On `REJECTED`, confirm `pending_mrs_count` decreased and review doc shows `REJECTED`.
 
 ---
 

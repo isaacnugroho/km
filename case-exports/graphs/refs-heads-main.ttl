@@ -133,4 +133,8 @@ GRAPH <http://km.local/graphs/main> {
     <http://app.local/km#WorkspaceService> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#ArchitectureConcept> .
     <http://app.local/km#WorkspaceService> <http://www.w3.org/2000/01/rdf-schema#label> "WorkspaceService"^^<http://www.w3.org/2001/XMLSchema#string> .
     <http://app.local/km#WorkspaceService> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <file://src/km/application/services/workspace_service.py> .
+    <http://app.local/km#rejectSemanticMrTool> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#ArchitectureConcept> .
+    <http://app.local/km#rejectSemanticMrTool> <http://www.w3.org/2000/01/rdf-schema#label> "reject_semantic_mr MCP tool"^^<http://www.w3.org/2001/XMLSchema#string> .
+    <http://app.local/km#validateBindingsTool> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://architecture.org/hexagonal#ArchitectureConcept> .
+    <http://app.local/km#validateBindingsTool> <http://www.w3.org/2000/01/rdf-schema#label> "validate_bindings MCP tool"^^<http://www.w3.org/2001/XMLSchema#string> .
 }

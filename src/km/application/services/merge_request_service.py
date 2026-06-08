@@ -27,8 +27,11 @@ from km.domain.governance import (
     KM_SEMANTIC_MERGE_REQUEST,
     KM_STATUS,
     KM_TARGET_ONTOLOGY,
+    KM_REJECTED_AT,
+    KM_REJECTOR,
     STATUS_APPROVED,
     STATUS_PENDING,
+    STATUS_REJECTED,
 )
 from km.exceptions import KmError, PermissionError
 from km.infrastructure.config.models import LOBinding, LOPackageConfig, AccessMode
@@ -78,6 +81,14 @@ def resolve_doc_identifier(
         if len(parts) != 2 or not parts[0] or not parts[1]:
             raise KmError(f"Invalid MR URI: {doc_identifier}")
         return parts[0], parts[1]
+
+    if raw.upper().startswith("MR-"):
+        for binding, _, _ in binding_data:
+            slug = binding.ontology_id.upper().replace("-", "_")
+            prefix = f"MR-{slug}-"
+            if raw.startswith(prefix):
+                return binding.ontology_id, raw
+        raise KmError(f"Cannot resolve MR id: {doc_identifier}")
 
     path = Path(raw)
     if not path.is_absolute():
@@ -251,9 +262,65 @@ class MergeRequestService:
         shacl_cache = ShaclCache.compile_from_lo_entries(self.lo_cache.entries)
         self.validation.reload_shapes(shacl_cache)
 
+        self.review_docs.update_review_doc_status(
+            ontology_id, mr_id, STATUS_APPROVED, timestamp=timestamp
+        )
+
         logger.info("Approved semantic MR %s for %s", mr_id, ontology_id)
         return {
             "status": STATUS_APPROVED,
+            "mr_id": mr_id,
+            "target_ontology": lo_config.base_uri,
+            "timestamp": timestamp,
+        }
+
+    def reject(self, doc_identifier: str) -> dict[str, Any]:
+        ontology_id, mr_id = resolve_doc_identifier(
+            doc_identifier, self.workspace_root, self.binding_data
+        )
+        binding, lo_config, _source_path = self._binding_for_ontology(ontology_id)
+        if binding.mode != AccessMode.CURATOR:
+            raise PermissionError(
+                f"reject_semantic_mr requires curator mode on binding '{binding.ontology_id}'"
+            )
+
+        entry = self.lo_source_store.get_entry(ontology_id)
+        mr_subject = NamedNode(f"{KM}{mr_id}")
+        gov_graph = NamedNode(lo_config.named_graphs.governance)
+        record = self._load_mr_record(entry, mr_subject, gov_graph)
+        if record["status"] != STATUS_PENDING:
+            raise KmError(
+                f"MR {mr_id} is not PENDING_APPROVAL (status={record['status']})"
+            )
+
+        timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        rejector = os.environ.get("KM_MR_REJECTOR", "developer")
+        entry.wrapper.store.remove(
+            Quad(mr_subject, NamedNode(KM_STATUS), Literal(STATUS_PENDING), gov_graph)
+        )
+        entry.wrapper.store.add(
+            Quad(mr_subject, NamedNode(KM_STATUS), Literal(STATUS_REJECTED), gov_graph)
+        )
+        entry.wrapper.store.add(
+            Quad(mr_subject, NamedNode(KM_REJECTOR), Literal(rejector), gov_graph)
+        )
+        entry.wrapper.store.add(
+            Quad(
+                mr_subject,
+                NamedNode(KM_REJECTED_AT),
+                Literal(timestamp, datatype=NamedNode(XSD_DATE_TIME)),
+                gov_graph,
+            )
+        )
+
+        self.lo_export.upsert_governance_mr_shard(entry, mr_id, mr_subject)
+        self.review_docs.update_review_doc_status(
+            ontology_id, mr_id, STATUS_REJECTED, timestamp=timestamp
+        )
+
+        logger.info("Rejected semantic MR %s for %s", mr_id, ontology_id)
+        return {
+            "status": STATUS_REJECTED,
             "mr_id": mr_id,
             "target_ontology": lo_config.base_uri,
             "timestamp": timestamp,

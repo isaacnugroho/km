@@ -120,11 +120,11 @@ Add one object per LO under `learning_ontologies` in `.km/config.json`. `source`
 
 ### Path resolution
 
-| Form                                     | Resolved against                             |
-| :--------------------------------------- | :------------------------------------------- |
-| Absolute (`/opt/km/ontologies/baking`)   | Used as-is                                   |
-| Relative (`../ontologies/baking`)        | Workspace root (directory containing `.km/`) |
-| Home (`~/km/ontologies/baking`)          | User home directory                          |
+| Form                                   | Resolved against                             |
+| :------------------------------------- | :------------------------------------------- |
+| Absolute (`/opt/km/ontologies/baking`) | Used as-is                                   |
+| Relative (`../ontologies/baking`)      | Workspace root (directory containing `.km/`) |
+| Home (`~/km/ontologies/baking`)        | User home directory                          |
 
 ### Access modes
 

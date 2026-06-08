@@ -48,6 +48,18 @@ def test_handle_ingest_success(tmp_workspace: Path) -> None:
         app.shutdown()
 
 
+def test_handle_validate_bindings(tmp_workspace: Path) -> None:
+    app = KMApplication.bootstrap(tmp_workspace)
+    try:
+        result = mcp_tools.handle_validate_bindings(app)
+        assert result["valid"] is True
+        assert len(result["bindings"]) == 1
+        assert result["bindings"][0]["ontology_id"] == "hexagonal-architecture"
+        assert result["errors"] == []
+    finally:
+        app.shutdown()
+
+
 def test_handle_validate_constraints(tmp_workspace: Path) -> None:
     app = KMApplication.bootstrap(tmp_workspace)
     try:
