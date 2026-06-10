@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import importlib
 import re
+from importlib.metadata import PackageNotFoundError
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 import semver
 
+import km
 from km import __version__
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -40,3 +44,10 @@ def test_semver_parse_release_tag() -> None:
     assert parsed.major == 0
     assert parsed.minor == 5
     assert parsed.patch == 1
+
+
+def test_package_version_fallback_when_not_installed() -> None:
+    with patch("importlib.metadata.version", side_effect=PackageNotFoundError()):
+        reloaded = importlib.reload(km)
+        assert reloaded.__version__ == "0.5.1"
+    importlib.reload(km)

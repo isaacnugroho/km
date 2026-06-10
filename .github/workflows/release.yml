@@ -40,6 +40,9 @@ jobs:
       - name: Run tests
         run: pytest
 
+      - name: Check per-file coverage threshold
+        run: python scripts/check_coverage_per_file.py --min 80
+
   build:
     needs: [validate-tag, test]
     strategy:

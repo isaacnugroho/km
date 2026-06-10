@@ -126,6 +126,18 @@ All logs go to **stderr** (safe for MCP stdio).
 pytest
 ```
 
+Coverage runs by default (terminal summary, `htmlcov/index.html`, and `coverage.xml`). CI enforces at least **80% per `src/km` module**:
+
+```bash
+python scripts/check_coverage_per_file.py --min 80
+```
+
+To skip coverage during local test runs:
+
+```bash
+pytest --no-cov
+```
+
 ## MCP tools
 
 | Tool                         | Status                                    |

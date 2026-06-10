@@ -7,7 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from km.adapters.cli.main import cmd_export_case, run_cli
+from km.adapters.cli.main import cmd_export_case, cmd_init, main, run_cli
+from km.exceptions import FeatureNotImplementedError
 from km.application.services.workspace_service import init_workspace
 
 
@@ -103,3 +104,81 @@ def test_run_cli_version(capsys) -> None:
         run_cli(["--version"])
     assert exc.value.code == 0
     assert __version__ in capsys.readouterr().out
+
+
+def test_run_cli_init(tmp_path: Path, capsys) -> None:
+    ws = tmp_path / "proj"
+    ws.mkdir()
+    assert run_cli(["init", "--path", str(ws)]) == 0
+    assert "Initialized workspace config" in capsys.readouterr().out
+    assert (ws / ".km" / "config.json").is_file()
+
+
+def test_run_cli_init_with_lo_source(
+    tmp_path: Path, lo_package: Path, capsys
+) -> None:
+    ws = tmp_path / "proj"
+    ws.mkdir()
+    assert (
+        run_cli(["init", "--path", str(ws), "--lo-source", str(lo_package)]) == 0
+    )
+    data = json.loads((ws / ".km" / "config.json").read_text(encoding="utf-8"))
+    assert data["learning_ontologies"][0]["source"] == str(lo_package)
+
+
+def test_cmd_init_prints_path(tmp_path: Path, capsys) -> None:
+    ws = tmp_path / "proj"
+    ws.mkdir()
+    cmd_init(ws, lo_source=None)
+    assert "Initialized workspace config" in capsys.readouterr().out
+
+
+def test_run_cli_mcp_delegates_to_server(monkeypatch: pytest.MonkeyPatch) -> None:
+    called: list[str] = []
+
+    def fake_mcp() -> None:
+        called.append("mcp")
+
+    monkeypatch.setattr("km.adapters.mcp.server.run_mcp_server", fake_mcp)
+    assert run_cli(["mcp"]) == 0
+    assert called == ["mcp"]
+
+
+def test_run_cli_feature_not_implemented(
+    monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    def fail_export() -> None:
+        raise FeatureNotImplementedError("export_case")
+
+    monkeypatch.setattr("km.adapters.cli.main.cmd_export_case", fail_export)
+    assert run_cli(["export-case"]) == 2
+    assert "feature not yet implemented" in capsys.readouterr().err
+
+
+def test_run_cli_km_error_returns_one(
+    monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    def fail_status() -> None:
+        raise FileNotFoundError("workspace missing")
+
+    monkeypatch.setattr("km.adapters.cli.main.cmd_status", fail_status)
+    assert run_cli(["status"]) == 1
+    assert "workspace missing" in capsys.readouterr().err
+
+
+def test_run_cli_keyboard_interrupt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def interrupt() -> None:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr("km.adapters.cli.main.cmd_status", interrupt)
+    assert run_cli(["status"]) == 130
+
+
+def test_main_exits_with_run_cli_code(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("km.adapters.cli.main.run_cli", lambda _argv: 7)
+    monkeypatch.setattr("km.adapters.cli.main.sys.argv", ["km", "status"])
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code == 7

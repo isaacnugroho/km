@@ -11,6 +11,7 @@ import pytest
 
 from km.exceptions import (
     ConfigError,
+    FeatureNotImplementedError,
     KmError,
     as_km_error,
     is_parser_syntax_error,
@@ -136,3 +137,44 @@ def test_load_workspace_config_invalid_json(tmp_workspace: Path) -> None:
     config_path.write_text("{not json", encoding="utf-8")
     with pytest.raises(ConfigError, match="Invalid JSON"):
         load_workspace_config(tmp_workspace)
+
+
+def test_feature_not_implemented_error_sets_feature() -> None:
+    err = FeatureNotImplementedError("export_case")
+    assert err.feature == "export_case"
+    assert "export_case" in str(err)
+
+
+def test_store_open_error_generic_os_error() -> None:
+    path = Path("/tmp/lo_quads.db")
+    err = store_open_error(path, OSError("disk failure"))
+    assert "disk failure" in str(err)
+
+
+def test_as_km_error_returns_km_error_instance() -> None:
+    original = KmError("already normalized")
+    assert as_km_error(original) is original
+
+
+def test_as_km_error_value_error() -> None:
+    err = as_km_error(ValueError("bad value"))
+    assert err is not None
+    assert "bad value" in str(err)
+
+
+def test_as_km_error_os_permission() -> None:
+    err = as_km_error(OSError(errno.EACCES, "Permission denied"))
+    assert err is not None
+    assert "Permission denied" in str(err)
+
+
+def test_as_km_error_os_no_space() -> None:
+    err = as_km_error(OSError(errno.ENOSPC, "No space"))
+    assert err is not None
+    assert "No space left on device" in str(err)
+
+
+def test_as_km_error_os_generic() -> None:
+    err = as_km_error(OSError("read-only filesystem"))
+    assert err is not None
+    assert "I/O error" in str(err)

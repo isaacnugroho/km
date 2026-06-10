@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from km.infrastructure.rdf.ref_mapping import (
     branch_path_to_graph_uri,
     branch_path_to_slug,
+    export_filename_to_git_ref,
     export_filename_to_graph_uri,
     graph_uri_to_branch_slug,
     ref_to_branch_path,
@@ -46,6 +49,33 @@ def test_export_filename_to_graph_uri_aligns_with_branch_path() -> None:
     branch = ref_to_branch_path(ref)
     from_filename = export_filename_to_graph_uri(ref_to_export_filename(ref))
     assert from_filename == branch_path_to_graph_uri(branch)
+
+
+def test_graph_uri_to_branch_slug_rejects_non_case_uri() -> None:
+    with pytest.raises(ValueError, match="Not a case branch graph URI"):
+        graph_uri_to_branch_slug("http://example.org/other")
+
+
+def test_ref_to_branch_path_strips_refs_prefixes() -> None:
+    assert ref_to_branch_path("refs/heads/feature/foo") == "feature/foo"
+    assert ref_to_branch_path("refs/tags/v1.0.0") == "tags/v1.0.0"
+    assert ref_to_branch_path("main") == "main"
+
+
+def test_export_filename_to_graph_uri_rejects_invalid_names() -> None:
+    assert export_filename_to_graph_uri("not-a-ttl-file.json") is None
+    assert export_filename_to_graph_uri("refs-tags-v1.ttl") is None
+
+
+def test_export_filename_to_git_ref_fallback_paths() -> None:
+    assert (
+        export_filename_to_git_ref("refs-heads-feature-foo.ttl")
+        == "refs/heads/feature/foo"
+    )
+    assert (
+        export_filename_to_git_ref("refs-tags-v1-0-0.ttl") == "refs/tags/v1/0/0"
+    )
+    assert export_filename_to_git_ref("random.ttl") is None
 
 
 def test_sync_manifest_paths() -> None:

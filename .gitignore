@@ -9,6 +9,7 @@ dist/
 build/
 scripts/pyinstaller/
 .coverage
+coverage.xml
 htmlcov/
 .cursor/
 usages/**/lo_quads.db
