@@ -60,6 +60,8 @@ Start the MCP server (stdio transport):
 km mcp
 ```
 
+The MCP server does **not** create or open `.km` files on startup. Agents call the MCP **`setup`** tool with `workspace_directory` before any other KM tool (see [usages/agents.md](usages/agents.md)).
+
 ## Cursor MCP configuration
 
 Add to your Cursor MCP settings (`.cursor/mcp.json` or Cursor Settings → MCP):
@@ -76,7 +78,24 @@ Add to your Cursor MCP settings (`.cursor/mcp.json` or Cursor Settings → MCP):
 }
 ```
 
-Use the absolute path to your workspace as `cwd` so `.km/config.json` is found.
+Use the absolute path to your workspace as `cwd` so agents can pass the same path to **`setup`**. Other MCP tools require **`setup`** first even when `cwd` is set.
+
+## Antigravity / global MCP configuration
+
+When the IDE cannot set per-workspace MCP `cwd` (e.g. Antigravity), configure `km mcp` globally without `cwd`:
+
+```json
+{
+  "mcpServers": {
+    "km": {
+      "command": "km",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+Agents must call MCP **`setup`** with the project root `workspace_directory` at the start of each session before using other KM tools.
 
 ### Standalone binary (PyInstaller)
 

@@ -28,13 +28,16 @@ There is **no** `km validate` CLI command. SHACL validation is **MCP-only** via 
 
 Agent default: **do not run shell `km`** except when the user explicitly requests `km init` or another CLI command. Never call a KM MCP tool from memory — read its schema under the MCP descriptor folder first. If an MCP tool fails, report the exact error; do **not** substitute CLI commands, hand-edited TTL, or skipped validation.
 
-Avoid opening a second KM process against `.km/case_quads.db` while `km mcp` is running.
+Avoid opening a second KM process against `.km/case_quads.db` while `km mcp` is running (e.g. do not run shell `km status` or `km export-case` against the same workspace).
+
+`km mcp` does not create or open `.km` files on startup. Agents call MCP **`setup`** first.
 
 ### MCP tools (agent operations)
 
 | MCP tool                     | When to use                                                                |
 | :--------------------------- | :------------------------------------------------------------------------- |
-| `status`                     | Task start; check branch, LO bindings, pending merges/exceptions/MRs       |
+| `setup`                      | **First** — every MCP session; pass `workspace_directory` (project root)   |
+| `status`                     | After setup; check branch, LO bindings, pending merges/exceptions/MRs      |
 | `validate_constraints`       | After code/fact changes; SHACL lint against LO canonical graphs            |
 | `ingest_case_facts`          | After structural code changes; write Turtle/JSON-LD to active branch graph |
 | `query_semantic_graph`       | Read-only SPARQL over case + LO graphs                                     |
@@ -111,7 +114,7 @@ my-app/
 └── src/
 ```
 
-MCP server entry: `.cursor/mcp.json` → `km mcp` with `cwd` = workspace root.
+MCP server entry: `.cursor/mcp.json` → `km mcp` (optionally with `cwd` = workspace root). Agents call MCP **`setup`** with `workspace_directory` before other tools.
 
 Example `.km/config.json`:
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 from km.exceptions import FeatureNotImplementedError
 
 FEATURES: dict[str, bool] = {
+    "setup": True,
     "status": True,
     "validate_bindings": True,
     "export_case": True,

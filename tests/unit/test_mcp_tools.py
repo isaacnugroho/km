@@ -12,6 +12,35 @@ from km.application.bootstrap import KMApplication
 from tests.fixtures_data import SAMPLE_CASE_TURTLE
 
 
+def test_handle_setup_creates_config_and_bootstraps(
+    tmp_path: Path, lo_package: Path
+) -> None:
+    ws = tmp_path / "setup-test"
+    ws.mkdir()
+    result, app = mcp_tools.handle_setup(str(ws), str(lo_package))
+    try:
+        assert result["status"] == "ready"
+        assert result["workspace_root"] == str(ws.resolve())
+        assert (ws / ".km" / "config.json").is_file()
+        assert (ws / ".km" / "case_quads.db").exists()
+        assert app.workspace.config.workspace_id
+    finally:
+        app.shutdown()
+
+
+def test_handle_setup_reuses_existing_app_for_same_workspace(
+    tmp_workspace: Path,
+) -> None:
+    first_result, first_app = mcp_tools.handle_setup(str(tmp_workspace))
+    second_result, second_app = mcp_tools.handle_setup(
+        str(tmp_workspace), existing_app=first_app
+    )
+    assert first_result["status"] == "ready"
+    assert second_result["status"] == "ready"
+    assert second_app is first_app
+    first_app.shutdown()
+
+
 def test_handle_status(tmp_workspace: Path) -> None:
     app = KMApplication.bootstrap(tmp_workspace)
     try:

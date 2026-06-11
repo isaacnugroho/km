@@ -141,3 +141,24 @@ def init_workspace(target: Path, *, lo_source: str | None = None) -> Path:
 
     logger.info("Initialized workspace at %s", target)
     return config_path
+
+
+def setup_mcp_workspace(
+    target: Path,
+    *,
+    lo_source: str | None = None,
+    existing_app: object | None = None,
+) -> tuple[object, Path]:
+    """Initialize workspace scaffolding and bootstrap the MCP application."""
+    from km.application.bootstrap import KMApplication
+
+    target = target.resolve()
+    config_path = init_workspace(target, lo_source=lo_source)
+
+    if existing_app is not None:
+        if existing_app.workspace_root == target:
+            return existing_app, config_path
+        existing_app.shutdown()
+
+    app = KMApplication.bootstrap(target, enable_git_watcher=True)
+    return app, config_path

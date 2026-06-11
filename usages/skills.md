@@ -2,13 +2,21 @@
 
 This document defines reusable, step-by-step workspace recipes ("skills") that agents and developer daemons can execute to automate Knowledge Management operations.
 
-**MCP tools (agent):** `status`, `validate_bindings`, `validate_constraints`, `ingest_case_facts`, `query_semantic_graph`, `propose_local_exception`, `approve_local_exception`, `propose_semantic_mr`, `approve_semantic_mr`, `reject_semantic_mr`, `sync_pending_branch_merges`, `resolve_branch_merge`, `export_case`.
+**MCP tools (agent):** `setup`, `status`, `validate_bindings`, `validate_constraints`, `ingest_case_facts`, `query_semantic_graph`, `propose_local_exception`, `approve_local_exception`, `propose_semantic_mr`, `approve_semantic_mr`, `reject_semantic_mr`, `sync_pending_branch_merges`, `resolve_branch_merge`, `export_case`.
 
 **CLI (human / no MCP):** `km init`, `km status`, `km mcp`, `km export-case` only. There is **no** `km validate` — use MCP **`validate_constraints`**.
 
 Never edit `.km/config.json` unless the user explicitly requests a config change (see [agents.md](agents.md) §3).
 
 Never call a KM MCP tool from memory; read `mcps/…/tools/<name>.json` first. On tool failure, report the error — do not invent CLI fallbacks or skip validation. See [agents.md](agents.md) §2 for the full interface contract and error-handling policy.
+
+## Workspace Setup (run first)
+
+**When:** Every MCP session start, or when switching projects (especially IDEs without per-workspace MCP `cwd`).
+
+1. **`setup`** with `workspace_directory` (project root path). Optional `lo_source` for first-time LO binding.
+2. Confirm `"status": "ready"` in the response.
+3. Proceed with the skills below.
 
 ---
 

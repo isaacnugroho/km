@@ -18,10 +18,10 @@ Every structural change you make to the symbolic layer must be reflected, verifi
 
 Two surfaces exist. Do not pattern-match CLI names to invent MCP tools or undocumented shell commands.
 
-| Surface                          | Purpose                      | Allowed                                                                                                                                                                                                                                                                                           |
-| :------------------------------- | :--------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **MCP tools** (agent KM work)    | All semantic operations      | `status`, `validate_bindings`, `validate_constraints`, `ingest_case_facts`, `query_semantic_graph`, `propose_local_exception`, `approve_local_exception`, `propose_semantic_mr`, `approve_semantic_mr`, `reject_semantic_mr`, `sync_pending_branch_merges`, `resolve_branch_merge`, `export_case` |
-| **`km` CLI** (shell, human-only) | Bootstrap / inspect / export | `init`, `status`, `mcp`, `export-case` only                                                                                                                                                                                                                                                       |
+| Surface                          | Purpose                      | Allowed                                                                                                                                                                                                                                                                                                    |
+| :------------------------------- | :--------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **MCP tools** (agent KM work)    | All semantic operations      | `setup`, `status`, `validate_bindings`, `validate_constraints`, `ingest_case_facts`, `query_semantic_graph`, `propose_local_exception`, `approve_local_exception`, `propose_semantic_mr`, `approve_semantic_mr`, `reject_semantic_mr`, `sync_pending_branch_merges`, `resolve_branch_merge`, `export_case` |
+| **`km` CLI** (shell, human-only) | Bootstrap / inspect / export | `init`, `status`, `mcp`, `export-case` only                                                                                                                                                                                                                                                                |
 
 **Rules:**
 
@@ -30,7 +30,7 @@ Two surfaces exist. Do not pattern-match CLI names to invent MCP tools or undocu
 - Never call a KM MCP tool from memory. Read its schema descriptor under `mcps/…/tools/<name>.json` before calling.
 - If an MCP tool fails, report the exact error. Do **not** guess CLI fallbacks, alternate tool names, hand-edited TTL, or skipped validation.
 - Do not map MCP `status` → shell `km status` unless the user asks for CLI output.
-- Do not open a second KM process against `.km/case_quads.db` while `km mcp` is running.
+- Do not open a second KM process against `.km/case_quads.db` while `km mcp` is running (e.g. do not run shell `km status` or `km export-case` against the same workspace).
 
 ### Anti-patterns
 
@@ -77,8 +77,18 @@ graph LR
 
 You MUST integrate KM MCP tool operations into your standard execution loop at specific checkpoints.
 
+### Phase 0: Workspace Setup (On Startup / Task Start)
+
+Before any other MCP tool or resource:
+
+1.  **`setup`** — pass `workspace_directory` (absolute project root). Optional `lo_source` when binding an LO package for the first time (same semantics as `km init --lo-source`).
+2.  Confirm `"status": "ready"` in the response.
+3.  Required on every MCP session start, and when switching projects. Especially when the IDE runs `km mcp` globally without per-workspace `cwd` (e.g. Antigravity).
+
+`km mcp` itself does not create or open `.km` files; only **`setup`** prepares the workspace.
+
 ### Phase 1: Context Ingestion & Alignment (On Startup / Task Start)
-Before writing any code or proposing plans, align your context window with the workspace's loaded ontologies:
+After Phase 0, before writing any code or proposing plans, align your context window with the workspace's loaded ontologies:
 1.  **`status`** — active Git branch, `branch_merge_policy`, `pending_branch_merges` (full entries with `approval_command`), `pending_branch_merges_count`, and loaded Learning Ontology bindings (ontology_id, source, mode, cache sync state). Same JSON as CLI `km status`.
 2.  **Inspect Active Schemas:** Read `km://schemas/learning-ontologies` for available classes, properties, and constraint boundaries (cached LO **canonical graphs** only).
 3.  **Read Case Triples:** Load `km://case/active-graph` or run targeted SPARQL via `query_semantic_graph` for existing branch facts.

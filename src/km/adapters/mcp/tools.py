@@ -3,15 +3,38 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
 from km.application.bootstrap import KMApplication
+from km.application.services.workspace_service import setup_mcp_workspace
 from km.application.services.feature_gate import require_implemented
 from km.application.services.merge_resolver_service import default_target_branch
 from km.exceptions import FeatureNotImplementedError, KmError, as_km_error
 from km.logging_config import get_logger
 
 logger = get_logger("mcp.tools")
+
+
+def handle_setup(
+    workspace_directory: str,
+    lo_source: str | None = None,
+    *,
+    existing_app: KMApplication | None = None,
+) -> tuple[dict[str, Any], KMApplication]:
+    target = Path(workspace_directory).expanduser()
+    app, config_path = setup_mcp_workspace(
+        target, lo_source=lo_source, existing_app=existing_app
+    )
+    return (
+        {
+            "status": "ready",
+            "workspace_root": str(app.workspace_root),
+            "config_path": str(config_path),
+            "workspace_id": app.workspace.config.workspace_id,
+        },
+        app,
+    )
 
 
 def handle_status(app: KMApplication) -> dict[str, Any]:

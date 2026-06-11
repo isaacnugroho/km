@@ -7,22 +7,31 @@ from mcp.server.fastmcp import FastMCP
 from km.adapters.mcp import resources as resource_handlers
 from km.adapters.mcp import tools as tool_handlers
 from km.application.bootstrap import KMApplication
-from km.exceptions import as_km_error
+from km.exceptions import WorkspaceNotConfiguredError, as_km_error
 from km.logging_config import configure_logging, get_logger
 
 logger = get_logger("mcp.server")
 
 mcp = FastMCP("km", log_level="WARNING")
 
+_SETUP_MESSAGE = (
+    "Workspace not configured — call setup with workspace_directory first"
+)
+
 
 def _get_app() -> KMApplication:
     if not hasattr(_get_app, "_app"):
-        try:
-            _get_app._app = KMApplication.bootstrap(enable_git_watcher=True)  # type: ignore[attr-defined]
-        except Exception as exc:
-            normalized = as_km_error(exc)
-            raise normalized if normalized is not None else exc
+        raise WorkspaceNotConfiguredError(_SETUP_MESSAGE)
     return _get_app._app  # type: ignore[attr-defined]
+
+
+def _set_app(app: KMApplication) -> None:
+    _get_app._app = app  # type: ignore[attr-defined]
+
+
+def _clear_app() -> None:
+    if hasattr(_get_app, "_app"):
+        delattr(_get_app, "_app")
 
 
 def _handle_tool_error(exc: Exception) -> str:
@@ -37,6 +46,20 @@ def _run_tool(handler):
         if km_exc is None:
             raise
         raise RuntimeError(_handle_tool_error(km_exc)) from km_exc
+
+
+@mcp.tool()
+def setup(workspace_directory: str, lo_source: str | None = None) -> str:
+    """Initialize or attach to a workspace directory and prepare MCP tools."""
+    try:
+        existing = _get_app()
+    except WorkspaceNotConfiguredError:
+        existing = None
+    result, app = tool_handlers.handle_setup(
+        workspace_directory, lo_source, existing_app=existing
+    )
+    _set_app(app)
+    return tool_handlers.json_result(result)
 
 
 @mcp.tool()

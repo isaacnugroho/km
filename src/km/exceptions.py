@@ -19,6 +19,10 @@ class WorkspaceNotFoundError(KmError):
     """No .km/ directory found while searching for workspace root."""
 
 
+class WorkspaceNotConfiguredError(KmError):
+    """MCP server has no active workspace — call setup first."""
+
+
 class FeatureNotImplementedError(KmError):
     """Raised when a wired surface is not yet implemented."""
 

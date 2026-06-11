@@ -6,12 +6,14 @@ import json
 from pathlib import Path
 
 from km.adapters.mcp import resources as resource_handlers
+from km.adapters.mcp import server as mcp_server
 from km.adapters.mcp import tools as mcp_tools
 from km.application.bootstrap import KMApplication
 from km.application.services.feature_gate import FEATURES
 from tests.fixtures_data import SAMPLE_CASE_TURTLE
 
 EXPECTED_TOOLS = {
+    "setup",
     "ingest_case_facts",
     "validate_bindings",
     "validate_constraints",
@@ -43,6 +45,23 @@ DRIVING_ADAPTER_SHAPE = f"{HEX}DrivingAdapterInvocationShape"
 def test_all_tool_feature_keys_registered() -> None:
     for tool in EXPECTED_TOOLS:
         assert tool in FEATURES
+
+
+def test_setup_status_validate_integration(tmp_workspace: Path) -> None:
+    mcp_server._clear_app()
+    try:
+        setup_payload = json.loads(mcp_server.setup(str(tmp_workspace)))
+        assert setup_payload["status"] == "ready"
+
+        status_payload = json.loads(mcp_server.status())
+        assert status_payload["active_branch"] == "main"
+
+        constraints_payload = json.loads(mcp_server.validate_constraints())
+        assert constraints_payload["conforms"] is True
+    finally:
+        if hasattr(mcp_server._get_app, "_app"):
+            mcp_server._get_app().shutdown()
+            mcp_server._clear_app()
 
 
 def test_bootstrap_and_status_integration(tmp_workspace: Path) -> None:

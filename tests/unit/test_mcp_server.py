@@ -11,7 +11,7 @@ import pytest
 
 from km.adapters.mcp import server as mcp_server
 from km.application.bootstrap import KMApplication
-from km.exceptions import KmError
+from km.exceptions import KmError, WorkspaceNotConfiguredError
 from tests.fixtures_data import SAMPLE_CASE_TURTLE
 
 SAMPLE_MR_INSERTIONS = """
@@ -24,15 +24,14 @@ hex:ServerPromotionClass a hex:ArchitectureConcept ;
 
 
 def _reset_mcp_app() -> None:
-    if hasattr(mcp_server._get_app, "_app"):
-        delattr(mcp_server._get_app, "_app")
+    mcp_server._clear_app()
 
 
 @pytest.fixture
 def mcp_app(tmp_workspace: Path) -> KMApplication:
     _reset_mcp_app()
     app = KMApplication.bootstrap(tmp_workspace)
-    mcp_server._get_app._app = app  # type: ignore[attr-defined]
+    mcp_server._set_app(app)
     yield app
     app.shutdown()
     _reset_mcp_app()
@@ -42,24 +41,69 @@ def mcp_app(tmp_workspace: Path) -> KMApplication:
 def mcp_curator_app(tmp_curator_workspace: Path) -> KMApplication:
     _reset_mcp_app()
     app = KMApplication.bootstrap(tmp_curator_workspace)
-    mcp_server._get_app._app = app  # type: ignore[attr-defined]
+    mcp_server._set_app(app)
     yield app
     app.shutdown()
     _reset_mcp_app()
 
 
-def test_get_app_bootstrap_failure_normalizes_km_error(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    if hasattr(mcp_server._get_app, "_app"):
-        delattr(mcp_server._get_app, "_app")
-
-    def fail_bootstrap(**_kwargs):
-        raise FileNotFoundError("missing workspace")
-
-    monkeypatch.setattr(mcp_server.KMApplication, "bootstrap", fail_bootstrap)
-    with pytest.raises(KmError, match="missing workspace"):
+def test_get_app_without_setup_raises() -> None:
+    _reset_mcp_app()
+    with pytest.raises(WorkspaceNotConfiguredError, match="setup"):
         mcp_server._get_app()
+
+
+def test_run_mcp_server_does_not_create_km_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ws = tmp_path / "proj"
+    ws.mkdir()
+    monkeypatch.chdir(ws)
+    monkeypatch.setattr(
+        mcp_server.mcp,
+        "run",
+        lambda transport: None,
+    )
+    mcp_server.run_mcp_server()
+    assert not (ws / ".km").exists()
+
+
+def test_setup_creates_workspace_and_sqlite(tmp_path: Path, lo_package: Path) -> None:
+    _reset_mcp_app()
+    ws = tmp_path / "fresh"
+    ws.mkdir()
+    payload = json.loads(
+        mcp_server.setup(str(ws), lo_source=str(lo_package))
+    )
+    assert payload["status"] == "ready"
+    assert payload["workspace_root"] == str(ws.resolve())
+    assert (ws / ".km" / "config.json").is_file()
+    assert (ws / ".km" / "case_quads.db").exists()
+    mcp_server._get_app().shutdown()
+    _reset_mcp_app()
+
+
+def test_setup_is_idempotent_for_same_workspace(tmp_workspace: Path) -> None:
+    _reset_mcp_app()
+    first = json.loads(mcp_server.setup(str(tmp_workspace)))
+    second = json.loads(mcp_server.setup(str(tmp_workspace)))
+    assert first["workspace_root"] == second["workspace_root"]
+    assert first["status"] == "ready"
+    assert second["status"] == "ready"
+    mcp_server._get_app().shutdown()
+    _reset_mcp_app()
+
+
+def test_setup_switches_workspace(
+    tmp_workspace: Path, tmp_curator_workspace: Path
+) -> None:
+    _reset_mcp_app()
+    json.loads(mcp_server.setup(str(tmp_workspace)))
+    assert mcp_server._get_app().workspace_root == tmp_workspace.resolve()
+    json.loads(mcp_server.setup(str(tmp_curator_workspace)))
+    assert mcp_server._get_app().workspace_root == tmp_curator_workspace.resolve()
+    mcp_server._get_app().shutdown()
+    _reset_mcp_app()
 
 
 def test_run_tool_reraises_non_km_errors() -> None:
