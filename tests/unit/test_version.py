@@ -19,17 +19,21 @@ PYPROJECT = REPO_ROOT / "pyproject.toml"
 VERSION_PATTERN = re.compile(r'^version\s*=\s*"([^"]+)"', re.MULTILINE)
 
 
-def test_package_version_matches_pyproject() -> None:
+def _pyproject_version() -> str:
     text = PYPROJECT.read_text(encoding="utf-8")
     match = VERSION_PATTERN.search(text)
     assert match is not None
-    assert __version__ == match.group(1)
+    return match.group(1)
+
+
+def test_package_version_matches_pyproject() -> None:
+    assert __version__ == _pyproject_version()
 
 
 def test_validate_release_tag_script_accepts_matching_tag(tmp_path: Path) -> None:
     from scripts.validate_release_tag import validate_tag
 
-    validate_tag("v0.5.1")
+    validate_tag(f"v{_pyproject_version()}")
 
 
 def test_validate_release_tag_script_rejects_mismatch() -> None:
@@ -40,14 +44,16 @@ def test_validate_release_tag_script_rejects_mismatch() -> None:
 
 
 def test_semver_parse_release_tag() -> None:
-    parsed = semver.VersionInfo.parse("0.5.1")
-    assert parsed.major == 0
-    assert parsed.minor == 5
-    assert parsed.patch == 1
+    project_version = _pyproject_version()
+    parsed = semver.VersionInfo.parse(project_version)
+    major, minor, patch = project_version.split(".")
+    assert parsed.major == int(major)
+    assert parsed.minor == int(minor)
+    assert parsed.patch == int(patch)
 
 
 def test_package_version_fallback_when_not_installed() -> None:
     with patch("importlib.metadata.version", side_effect=PackageNotFoundError()):
         reloaded = importlib.reload(km)
-        assert reloaded.__version__ == "0.5.1"
+        assert reloaded.__version__ == _pyproject_version()
     importlib.reload(km)
