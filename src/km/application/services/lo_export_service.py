@@ -7,6 +7,7 @@ from pathlib import Path
 from pyoxigraph import NamedNode
 
 from km.application.services.lo_source_store_service import LOSourceStoreEntry
+from km.infrastructure.rdf.store import QuadStoreWrapper
 from km.infrastructure.rdf.serialization import (
     serialize_canonical_export,
     serialize_graph_block,
@@ -22,11 +23,12 @@ class LOExportService:
         entry: LOSourceStoreEntry,
         mr_id: str,
         mr_subject: NamedNode,
+        wrapper: QuadStoreWrapper,
     ) -> Path:
         gov_graph = entry.lo_config.named_graphs.governance
         quads = [
             quad
-            for quad in entry.wrapper.quads_in_graph(gov_graph)
+            for quad in wrapper.quads_in_graph(gov_graph)
             if quad.subject == mr_subject
         ]
         export_path = entry.source_path / "exports" / "governance" / f"{mr_id}.ttl"
@@ -39,9 +41,11 @@ class LOExportService:
         logger.info("Upserted governance export %s", export_path)
         return export_path
 
-    def regenerate_main_ttl(self, entry: LOSourceStoreEntry) -> Path:
+    def regenerate_main_ttl(
+        self, entry: LOSourceStoreEntry, wrapper: QuadStoreWrapper
+    ) -> Path:
         canonical_uri = entry.lo_config.named_graphs.canonical
-        quads = entry.wrapper.quads_in_graph(canonical_uri)
+        quads = wrapper.quads_in_graph(canonical_uri)
         export_path = entry.source_path / "exports" / "main.ttl"
         export_path.write_text(serialize_canonical_export(quads), encoding="utf-8")
         logger.info("Regenerated canonical export %s", export_path)

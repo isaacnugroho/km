@@ -63,6 +63,34 @@ def test_source_store_skips_rebuild_when_exports_unchanged(
     service2.close()
 
 
+def test_source_store_open_entry_releases_lock_for_other_processes(
+    tmp_workspace: Path, lo_package: Path
+) -> None:
+    """Short-lived opens allow another bootstrap after the first service closes."""
+    binding = LOBinding(
+        ontology_id="hexagonal-architecture",
+        source=str(lo_package),
+        mode=AccessMode.READ_ONLY,
+    )
+    _, lo_config = validate_lo_binding(binding, tmp_workspace)
+    service_a = LOSourceStoreService()
+    service_a.bootstrap_all(
+        [(binding, lo_config, lo_package)], km_dir=tmp_workspace / ".km"
+    )
+    entry = service_a.get_entry("hexagonal-architecture")
+    with service_a.open_entry(entry) as wrapper:
+        assert wrapper.ask("ASK { }") is True
+    service_a.close()
+
+    service_b = LOSourceStoreService()
+    entry_b = service_b.bootstrap_all(
+        [(binding, lo_config, lo_package)], km_dir=tmp_workspace / ".km"
+    )[0]
+    with service_b.open_entry(entry_b) as wrapper:
+        assert wrapper.ask("ASK { }") is True
+    service_b.close()
+
+
 def test_governance_graph_serializes_from_source_store(
     tmp_workspace: Path, lo_package: Path
 ) -> None:
@@ -88,7 +116,8 @@ GRAPH <{gov_graph}> {{
     entry = service.bootstrap_all(
         [(binding, lo_config, lo_package)], km_dir=tmp_workspace / ".km"
     )[0]
-    content = entry.wrapper.serialize_graph(gov_graph)
+    with service.open_entry(entry) as wrapper:
+        content = wrapper.serialize_graph(gov_graph)
     assert "MR-HEX-001" in content
     assert "APPROVED" in content
     service.close()

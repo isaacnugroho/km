@@ -13,6 +13,7 @@ from km.infrastructure.rdf.shacl_cache import (
     is_usable_sparql_prefix,
     lo_ontology_uri,
     lo_prefix_name,
+    reconcile_graph_prefix_bindings,
 )
 
 
@@ -30,6 +31,28 @@ def test_lo_ontology_uri() -> None:
 def test_collect_export_prefixes_hexagonal_architecture(lo_package: Path) -> None:
     prefixes = collect_export_prefixes(lo_package)
     assert prefixes["hex"] == "http://architecture.org/hexagonal#"
+    assert "brick" not in prefixes
+
+
+def test_reconcile_graph_prefix_bindings_prefers_export_label() -> None:
+    export = {"hex": "http://architecture.org/hexagonal#"}
+    resolved = reconcile_graph_prefix_bindings(
+        export,
+        "hexagonal_architecture",
+        "http://architecture.org/hexagonal#",
+    )
+    assert resolved == {"hex": "http://architecture.org/hexagonal#"}
+    assert "hexagonal_architecture" not in resolved
+
+
+def test_reconcile_graph_prefix_bindings_keeps_config_only_prefix(tmp_path: Path) -> None:
+    export: dict[str, str] = {}
+    resolved = reconcile_graph_prefix_bindings(
+        export,
+        "custom_lo",
+        "http://example.org/custom#",
+    )
+    assert resolved == {"custom_lo": "http://example.org/custom#"}
 
 
 def test_collect_export_prefixes_reads_author_prefixes(tmp_path: Path) -> None:

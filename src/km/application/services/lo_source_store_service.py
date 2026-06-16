@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -36,7 +38,6 @@ class LOSourceStoreEntry:
     lo_config: LOPackageConfig
     store_path: Path
     manifest_path: Path
-    wrapper: QuadStoreWrapper
     rebuilt: bool
 
 
@@ -100,14 +101,12 @@ class LOSourceStoreService:
             export_checksums=current_checksums,
         )
 
-        wrapper = QuadStoreWrapper(store_path)
         return LOSourceStoreEntry(
             binding=binding,
             source_path=source_path,
             lo_config=lo_config,
             store_path=store_path,
             manifest_path=manifest_path,
-            wrapper=wrapper,
             rebuilt=rebuild,
         )
 
@@ -117,7 +116,26 @@ class LOSourceStoreService:
                 return entry
         raise KmError(f"Unknown learning ontology: {ontology_id}")
 
+    @contextmanager
+    def open_store(self, ontology_id: str) -> Iterator[tuple[LOSourceStoreEntry, QuadStoreWrapper]]:
+        """Open the source LO store for one operation, then release the lock."""
+        entry = self.get_entry(ontology_id)
+        wrapper = QuadStoreWrapper(entry.store_path)
+        try:
+            yield entry, wrapper
+        finally:
+            wrapper.close()
+
+    @contextmanager
+    def open_entry(
+        self, entry: LOSourceStoreEntry
+    ) -> Iterator[QuadStoreWrapper]:
+        """Open a known entry's store for one operation, then release the lock."""
+        wrapper = QuadStoreWrapper(entry.store_path)
+        try:
+            yield wrapper
+        finally:
+            wrapper.close()
+
     def close(self) -> None:
-        for entry in self.entries:
-            entry.wrapper.close()
         self.entries.clear()

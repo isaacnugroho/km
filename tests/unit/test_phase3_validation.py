@@ -73,6 +73,79 @@ def test_sparql_constraint_resolves_lo_prefix(tmp_workspace: Path) -> None:
         app.shutdown()
 
 
+def test_sparql_constraint_with_derived_lo_prefix(tmp_path: Path) -> None:
+    """LO exports use hex: but config omits prefix (derived hexagonal_architecture)."""
+    import json
+
+    from tests.conftest import _init_git_repo
+
+    lo_root = tmp_path / "hexagonal-architecture"
+    exports = lo_root / "exports"
+    exports.mkdir(parents=True)
+    fixture_lo = Path(__file__).resolve().parents[1] / "fixtures/lo-packages/hexagonal-architecture"
+    (exports / "main.ttl").write_text(
+        (fixture_lo / "exports/main.ttl").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    (lo_root / "config.json").write_text(
+        json.dumps(
+            {
+                "ontology_id": "hexagonal-architecture",
+                "base_uri": "http://architecture.org/hexagonal",
+                "quad_store": {
+                    "engine": "sqlite-quad",
+                    "storage_path": "./lo_quads.db",
+                },
+                "named_graphs": {
+                    "canonical": (
+                        "http://km.local/learning-ontologies/"
+                        "hexagonal-architecture/canonical"
+                    ),
+                    "governance": (
+                        "http://km.local/learning-ontologies/"
+                        "hexagonal-architecture/governance"
+                    ),
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (exports / "governance").mkdir(exist_ok=True)
+
+    ws = tmp_path / "workspace"
+    ws.mkdir()
+    _init_git_repo(ws)
+    km_dir = ws / ".km"
+    km_dir.mkdir()
+    config = {
+        "workspace_id": "derived-prefix-workspace",
+        "learning_ontologies": [
+            {
+                "ontology_id": "hexagonal-architecture",
+                "source": str(lo_root),
+                "mode": "read_only",
+            }
+        ],
+        "lo_cache": {"base_path": "./.km/lo-cache"},
+        "case_exports": {"base_path": "./case-exports", "export_policy": "on_commit"},
+        "branch_merge": {"policy": "auto_merge_exception"},
+    }
+    (km_dir / "config.json").write_text(json.dumps(config, indent=2), encoding="utf-8")
+    (ws / "case-exports" / "graphs").mkdir(parents=True)
+    (ws / "case-exports" / "governance").mkdir(parents=True)
+
+    app = KMApplication.bootstrap(ws)
+    try:
+        mcp_tools.handle_ingest_case_facts(app, ORPHAN_PORT_TURTLE, "turtle")
+        result = mcp_tools.handle_validate_constraints(app)
+        assert result["conforms"] is False
+        assert any(
+            PORT_OWNERSHIP_SHAPE in v["source_shape"] for v in result["violations"]
+        )
+    finally:
+        app.shutdown()
+
+
 def test_validation_cache_hit(tmp_workspace: Path) -> None:
     app = KMApplication.bootstrap(tmp_workspace)
     try:

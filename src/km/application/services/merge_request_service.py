@@ -40,6 +40,7 @@ from km.exceptions import KmError, PermissionError
 from km.infrastructure.config.models import LOBinding, LOPackageConfig, AccessMode
 from km.infrastructure.rdf.parse import parse_facts
 from km.infrastructure.rdf.shacl_cache import ShaclCache
+from km.infrastructure.rdf.store import QuadStoreWrapper
 from km.logging_config import get_logger
 
 logger = get_logger("merge_request")
@@ -144,67 +145,75 @@ class MergeRequestService:
                 f"propose_semantic_mr requires curator mode on binding '{binding.ontology_id}'"
             )
 
-        entry = self.lo_source_store.get_entry(binding.ontology_id)
-        mr_id = self._mint_mr_id(entry)
-        proposal_uri = proposal_graph_uri(binding.ontology_id, mr_id)
-        created_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-        author = os.environ.get("KM_MR_AUTHOR", "km-agent")
+        with self.lo_source_store.open_store(binding.ontology_id) as (entry, wrapper):
+            mr_id = self._mint_mr_id(entry, wrapper)
+            proposal_uri = proposal_graph_uri(binding.ontology_id, mr_id)
+            created_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+            author = os.environ.get("KM_MR_AUTHOR", "km-agent")
 
-        insertion_quads = self._parse_diff(diff_insertions, proposal_uri, "insertions")
-        for quad in insertion_quads:
-            entry.wrapper.store.add(quad)
+            insertion_quads = self._parse_diff(
+                diff_insertions, proposal_uri, "insertions"
+            )
+            for quad in insertion_quads:
+                wrapper.store.add(quad)
 
-        gov_graph = NamedNode(lo_config.named_graphs.governance)
-        mr_subject = NamedNode(f"{KM}{mr_id}")
-        rel_review_doc = self.review_docs.review_doc_relative_path(
-            binding.ontology_id, mr_id
-        )
+            gov_graph = NamedNode(lo_config.named_graphs.governance)
+            mr_subject = NamedNode(f"{KM}{mr_id}")
+            rel_review_doc = self.review_docs.review_doc_relative_path(
+                binding.ontology_id, mr_id
+            )
 
-        governance_quads = [
-            Quad(
-                mr_subject,
-                NamedNode(RDF_TYPE),
-                NamedNode(KM_SEMANTIC_MERGE_REQUEST),
-                gov_graph,
-            ),
-            Quad(mr_subject, NamedNode(KM_STATUS), Literal(STATUS_PENDING), gov_graph),
-            Quad(
-                mr_subject,
-                NamedNode(KM_TARGET_ONTOLOGY),
-                NamedNode(lo_config.base_uri),
-                gov_graph,
-            ),
-            Quad(
-                mr_subject,
-                NamedNode(KM_PROPOSAL_GRAPH),
-                NamedNode(proposal_uri),
-                gov_graph,
-            ),
-            Quad(mr_subject, NamedNode(KM_RATIONALE), Literal(rationale), gov_graph),
-            Quad(mr_subject, NamedNode(KM_AUTHOR), Literal(author), gov_graph),
-            Quad(
-                mr_subject,
-                NamedNode(KM_CREATED_AT),
-                Literal(created_at, datatype=NamedNode(XSD_DATE_TIME)),
-                gov_graph,
-            ),
-            Quad(
-                mr_subject, NamedNode(KM_REVIEW_DOC), Literal(rel_review_doc), gov_graph
-            ),
-        ]
-        if diff_deletions.strip():
-            governance_quads.append(
+            governance_quads = [
                 Quad(
                     mr_subject,
-                    NamedNode(KM_DIFF_DELETIONS),
-                    Literal(diff_deletions),
+                    NamedNode(RDF_TYPE),
+                    NamedNode(KM_SEMANTIC_MERGE_REQUEST),
                     gov_graph,
+                ),
+                Quad(
+                    mr_subject, NamedNode(KM_STATUS), Literal(STATUS_PENDING), gov_graph
+                ),
+                Quad(
+                    mr_subject,
+                    NamedNode(KM_TARGET_ONTOLOGY),
+                    NamedNode(lo_config.base_uri),
+                    gov_graph,
+                ),
+                Quad(
+                    mr_subject,
+                    NamedNode(KM_PROPOSAL_GRAPH),
+                    NamedNode(proposal_uri),
+                    gov_graph,
+                ),
+                Quad(mr_subject, NamedNode(KM_RATIONALE), Literal(rationale), gov_graph),
+                Quad(mr_subject, NamedNode(KM_AUTHOR), Literal(author), gov_graph),
+                Quad(
+                    mr_subject,
+                    NamedNode(KM_CREATED_AT),
+                    Literal(created_at, datatype=NamedNode(XSD_DATE_TIME)),
+                    gov_graph,
+                ),
+                Quad(
+                    mr_subject,
+                    NamedNode(KM_REVIEW_DOC),
+                    Literal(rel_review_doc),
+                    gov_graph,
+                ),
+            ]
+            if diff_deletions.strip():
+                governance_quads.append(
+                    Quad(
+                        mr_subject,
+                        NamedNode(KM_DIFF_DELETIONS),
+                        Literal(diff_deletions),
+                        gov_graph,
+                    )
                 )
-            )
-        for quad in governance_quads:
-            entry.wrapper.store.add(quad)
+            for quad in governance_quads:
+                wrapper.store.add(quad)
 
-        self.lo_export.upsert_governance_mr_shard(entry, mr_id, mr_subject)
+            self.lo_export.upsert_governance_mr_shard(entry, mr_id, mr_subject, wrapper)
+
         self.review_docs.write_review_doc(
             ontology_id=binding.ontology_id,
             mr_id=mr_id,
@@ -235,42 +244,49 @@ class MergeRequestService:
                 f"approve_semantic_mr requires curator mode on binding '{binding.ontology_id}'"
             )
 
-        entry = self.lo_source_store.get_entry(ontology_id)
-        mr_subject = NamedNode(f"{KM}{mr_id}")
-        gov_graph = NamedNode(lo_config.named_graphs.governance)
-        record = self._load_mr_record(entry, mr_subject, gov_graph)
-        if record["status"] != STATUS_PENDING:
-            raise KmError(
-                f"MR {mr_id} is not PENDING_APPROVAL (status={record['status']})"
+        with self.lo_source_store.open_store(ontology_id) as (entry, wrapper):
+            mr_subject = NamedNode(f"{KM}{mr_id}")
+            gov_graph = NamedNode(lo_config.named_graphs.governance)
+            record = self._load_mr_record(wrapper, mr_subject, gov_graph)
+            if record["status"] != STATUS_PENDING:
+                raise KmError(
+                    f"MR {mr_id} is not PENDING_APPROVAL (status={record['status']})"
+                )
+
+            proposal_uri = record["proposal_graph"]
+            canonical = NamedNode(lo_config.named_graphs.canonical)
+            self._merge_proposal_into_canonical(wrapper, proposal_uri, canonical)
+            self._apply_deletions(
+                wrapper, mr_subject, gov_graph, proposal_uri, canonical
             )
 
-        proposal_uri = record["proposal_graph"]
-        canonical = NamedNode(lo_config.named_graphs.canonical)
-        self._merge_proposal_into_canonical(entry, proposal_uri, canonical)
-        self._apply_deletions(entry, mr_subject, gov_graph, proposal_uri, canonical)
-
-        timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-        approver = os.environ.get("KM_MR_APPROVER", "developer")
-        entry.wrapper.store.remove(
-            Quad(mr_subject, NamedNode(KM_STATUS), Literal(STATUS_PENDING), gov_graph)
-        )
-        entry.wrapper.store.add(
-            Quad(mr_subject, NamedNode(KM_STATUS), Literal(STATUS_APPROVED), gov_graph)
-        )
-        entry.wrapper.store.add(
-            Quad(mr_subject, NamedNode(KM_APPROVER), Literal(approver), gov_graph)
-        )
-        entry.wrapper.store.add(
-            Quad(
-                mr_subject,
-                NamedNode(KM_APPROVED_AT),
-                Literal(timestamp, datatype=NamedNode(XSD_DATE_TIME)),
-                gov_graph,
+            timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+            approver = os.environ.get("KM_MR_APPROVER", "developer")
+            wrapper.store.remove(
+                Quad(
+                    mr_subject, NamedNode(KM_STATUS), Literal(STATUS_PENDING), gov_graph
+                )
             )
-        )
+            wrapper.store.add(
+                Quad(
+                    mr_subject, NamedNode(KM_STATUS), Literal(STATUS_APPROVED), gov_graph
+                )
+            )
+            wrapper.store.add(
+                Quad(mr_subject, NamedNode(KM_APPROVER), Literal(approver), gov_graph)
+            )
+            wrapper.store.add(
+                Quad(
+                    mr_subject,
+                    NamedNode(KM_APPROVED_AT),
+                    Literal(timestamp, datatype=NamedNode(XSD_DATE_TIME)),
+                    gov_graph,
+                )
+            )
 
-        self.lo_export.regenerate_main_ttl(entry)
-        self.lo_export.upsert_governance_mr_shard(entry, mr_id, mr_subject)
+            self.lo_export.regenerate_main_ttl(entry, wrapper)
+            self.lo_export.upsert_governance_mr_shard(entry, mr_id, mr_subject, wrapper)
+
         cache_entry = self.lo_cache.resync_binding(binding, lo_config, source_path)
         self._replace_cache_entry(cache_entry)
         shacl_cache = ShaclCache.compile_from_lo_entries(self.lo_cache.entries)
@@ -298,36 +314,41 @@ class MergeRequestService:
                 f"reject_semantic_mr requires curator mode on binding '{binding.ontology_id}'"
             )
 
-        entry = self.lo_source_store.get_entry(ontology_id)
-        mr_subject = NamedNode(f"{KM}{mr_id}")
-        gov_graph = NamedNode(lo_config.named_graphs.governance)
-        record = self._load_mr_record(entry, mr_subject, gov_graph)
-        if record["status"] != STATUS_PENDING:
-            raise KmError(
-                f"MR {mr_id} is not PENDING_APPROVAL (status={record['status']})"
+        with self.lo_source_store.open_store(ontology_id) as (entry, wrapper):
+            mr_subject = NamedNode(f"{KM}{mr_id}")
+            gov_graph = NamedNode(lo_config.named_graphs.governance)
+            record = self._load_mr_record(wrapper, mr_subject, gov_graph)
+            if record["status"] != STATUS_PENDING:
+                raise KmError(
+                    f"MR {mr_id} is not PENDING_APPROVAL (status={record['status']})"
+                )
+
+            timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+            rejector = os.environ.get("KM_MR_REJECTOR", "developer")
+            wrapper.store.remove(
+                Quad(
+                    mr_subject, NamedNode(KM_STATUS), Literal(STATUS_PENDING), gov_graph
+                )
+            )
+            wrapper.store.add(
+                Quad(
+                    mr_subject, NamedNode(KM_STATUS), Literal(STATUS_REJECTED), gov_graph
+                )
+            )
+            wrapper.store.add(
+                Quad(mr_subject, NamedNode(KM_REJECTOR), Literal(rejector), gov_graph)
+            )
+            wrapper.store.add(
+                Quad(
+                    mr_subject,
+                    NamedNode(KM_REJECTED_AT),
+                    Literal(timestamp, datatype=NamedNode(XSD_DATE_TIME)),
+                    gov_graph,
+                )
             )
 
-        timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-        rejector = os.environ.get("KM_MR_REJECTOR", "developer")
-        entry.wrapper.store.remove(
-            Quad(mr_subject, NamedNode(KM_STATUS), Literal(STATUS_PENDING), gov_graph)
-        )
-        entry.wrapper.store.add(
-            Quad(mr_subject, NamedNode(KM_STATUS), Literal(STATUS_REJECTED), gov_graph)
-        )
-        entry.wrapper.store.add(
-            Quad(mr_subject, NamedNode(KM_REJECTOR), Literal(rejector), gov_graph)
-        )
-        entry.wrapper.store.add(
-            Quad(
-                mr_subject,
-                NamedNode(KM_REJECTED_AT),
-                Literal(timestamp, datatype=NamedNode(XSD_DATE_TIME)),
-                gov_graph,
-            )
-        )
+            self.lo_export.upsert_governance_mr_shard(entry, mr_id, mr_subject, wrapper)
 
-        self.lo_export.upsert_governance_mr_shard(entry, mr_id, mr_subject)
         self.review_docs.update_review_doc_status(
             ontology_id, mr_id, STATUS_REJECTED, timestamp=timestamp
         )
@@ -355,7 +376,8 @@ class MergeRequestService:
                     }}
                 }}
             """
-            total += len(entry.wrapper.query(query))
+            with self.lo_source_store.open_entry(entry) as wrapper:
+                total += len(wrapper.query(query))
         return total
 
     def _binding_for_ontology(
@@ -375,7 +397,7 @@ class MergeRequestService:
 
     def _load_mr_record(
         self,
-        entry: LOSourceStoreEntry,
+        wrapper: QuadStoreWrapper,
         mr_subject: NamedNode,
         gov_graph: NamedNode,
     ) -> dict[str, str]:
@@ -388,7 +410,7 @@ class MergeRequestService:
                 }}
             }}
         """
-        rows = entry.wrapper.query(query)
+        rows = wrapper.query(query)
         if not rows:
             raise KmError(f"Semantic merge request not found: {mr_subject.value}")
         row = rows[0]
@@ -400,49 +422,45 @@ class MergeRequestService:
 
     def _merge_proposal_into_canonical(
         self,
-        entry: LOSourceStoreEntry,
+        wrapper: QuadStoreWrapper,
         proposal_uri: str,
         canonical: NamedNode,
     ) -> None:
-        for quad in entry.wrapper.quads_in_graph(proposal_uri):
-            entry.wrapper.store.add(
-                Quad(quad.subject, quad.predicate, quad.object, canonical)
-            )
+        for quad in wrapper.quads_in_graph(proposal_uri):
+            wrapper.store.add(Quad(quad.subject, quad.predicate, quad.object, canonical))
 
     def _apply_deletions(
         self,
-        entry: LOSourceStoreEntry,
+        wrapper: QuadStoreWrapper,
         mr_subject: NamedNode,
         gov_graph: NamedNode,
         proposal_uri: str,
         canonical: NamedNode,
     ) -> None:
-        deletions = self._literal_object(
-            entry, mr_subject, gov_graph, KM_DIFF_DELETIONS
-        )
+        deletions = self._literal_object(wrapper, mr_subject, gov_graph, KM_DIFF_DELETIONS)
         if not deletions:
             return
         for quad in self._parse_diff(deletions, proposal_uri, "deletions"):
             canonical_quad = Quad(quad.subject, quad.predicate, quad.object, canonical)
-            entry.wrapper.remove_quad(canonical_quad)
+            wrapper.remove_quad(canonical_quad)
 
     def _literal_object(
         self,
-        entry: LOSourceStoreEntry,
+        wrapper: QuadStoreWrapper,
         subject: NamedNode,
         graph: NamedNode,
         predicate_uri: str,
     ) -> str | None:
-        for quad in entry.wrapper.store.quads_for_pattern(
+        for quad in wrapper.store.quads_for_pattern(
             subject, NamedNode(predicate_uri), None, graph
         ):
             if isinstance(quad.object, Literal):
                 return quad.object.value
         return None
 
-    def _mint_mr_id(self, entry: LOSourceStoreEntry) -> str:
+    def _mint_mr_id(self, entry: LOSourceStoreEntry, wrapper: QuadStoreWrapper) -> str:
         gov_graph = entry.lo_config.named_graphs.governance
-        existing = entry.wrapper.query(
+        existing = wrapper.query(
             f"""
             SELECT ?mr WHERE {{
                 GRAPH <{gov_graph}> {{

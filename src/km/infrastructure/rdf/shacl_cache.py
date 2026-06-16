@@ -19,6 +19,11 @@ logger = get_logger("shacl_cache")
 KM_LEARNING_ONTOLOGY = "http://km.local/learning-ontologies/"
 
 _SPARQL_PREFIX_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
+_TURTLE_PREFIX_DECL = re.compile(
+    r"^\s*@prefix\s+([A-Za-z_][A-Za-z0-9_-]*)\s*:\s*<([^>]+)>\s*\.\s*$",
+    re.MULTILINE,
+)
+_SPARQL_QNAME_PREFIX = re.compile(r'(?<![<"])\b([A-Za-z_][A-Za-z0-9_-]*):')
 
 
 def is_usable_sparql_prefix(prefix: str) -> bool:
@@ -57,17 +62,80 @@ def lo_ontology_uri(ontology_id: str) -> str:
     return f"{KM_LEARNING_ONTOLOGY}{ontology_id}"
 
 
+def _normalize_namespace_uri(namespace_uri: str) -> str:
+    uri = namespace_uri.rstrip("/")
+    if not uri.endswith("#"):
+        uri = f"{uri}#"
+    return uri
+
+
 def collect_export_prefixes(source_path: Path) -> dict[str, str]:
     """Read @prefix declarations from LO exports/main.ttl (authoritative for SPARQL in shapes)."""
     main_ttl = source_path / "exports" / "main.ttl"
     if not main_ttl.is_file():
         return {}
-    parsed = Graph()
-    parsed.parse(main_ttl, format="turtle")
     bindings: dict[str, str] = {}
-    for prefix, namespace in parsed.namespace_manager.namespaces():
-        bindings[str(prefix)] = str(namespace)
+    for match in _TURTLE_PREFIX_DECL.finditer(main_ttl.read_text(encoding="utf-8")):
+        bindings[match.group(1)] = _normalize_namespace_uri(match.group(2))
     return filter_prefix_bindings(bindings)
+
+
+def reconcile_graph_prefix_bindings(
+    export_prefixes: dict[str, str],
+    primary_prefix: str,
+    primary_ns: str,
+) -> dict[str, str]:
+    """Return one SPARQL prefix per namespace for rdflib/pyshacl graph binding.
+
+    When exports declare ``hex:`` and config omits ``prefix`` (falling back to
+    ``hexagonal_architecture``), both labels can target the same namespace URI.
+    rdflib keeps only one reverse mapping per namespace, so export labels win.
+    """
+    candidates: dict[str, str] = dict(export_prefixes)
+    if primary_prefix not in candidates:
+        candidates[primary_prefix] = primary_ns
+
+    by_namespace: dict[str, list[str]] = {}
+    for prefix, namespace_uri in candidates.items():
+        if not is_usable_sparql_prefix(prefix):
+            continue
+        norm_ns = _normalize_namespace_uri(namespace_uri)
+        by_namespace.setdefault(norm_ns, []).append(prefix)
+
+    export_labels = set(export_prefixes)
+    resolved: dict[str, str] = {}
+    for norm_ns, prefixes in by_namespace.items():
+        from_export = [p for p in prefixes if p in export_labels]
+        if from_export:
+            chosen = min(from_export, key=len)
+        elif primary_prefix in prefixes:
+            chosen = primary_prefix
+        else:
+            chosen = sorted(prefixes)[0]
+        resolved[chosen] = norm_ns
+    return resolved
+
+
+def collect_sparql_prefixes_from_shapes(shapes_graph: Graph) -> set[str]:
+    """QName prefixes referenced in sh:select SPARQL constraints."""
+    prefixes: set[str] = set()
+    for select in shapes_graph.objects(None, SH.select):
+        if isinstance(select, Literal):
+            prefixes.update(_SPARQL_QNAME_PREFIX.findall(str(select)))
+    return {p for p in prefixes if is_usable_sparql_prefix(p)}
+
+
+def sparql_declare_prefix_bindings(
+    graph_prefixes: dict[str, str],
+    export_prefixes: dict[str, str],
+    shapes_graph: Graph,
+) -> dict[str, str]:
+    """All prefix labels that sh:declare must expose for SPARQL constraints."""
+    declared = dict(graph_prefixes)
+    for prefix in collect_sparql_prefixes_from_shapes(shapes_graph):
+        if prefix in export_prefixes:
+            declared[prefix] = export_prefixes[prefix]
+    return filter_prefix_bindings(declared)
 
 
 def inject_lo_sparql_prefixes(
@@ -168,20 +236,26 @@ class ShaclCache:
                 primary_prefix = entry.lo_config.prefix or lo_prefix_name(
                     entry.binding.ontology_id
                 )
-                lo_prefixes = collect_export_prefixes(entry.source_path)
-                lo_prefixes[primary_prefix] = primary_ns
-                lo_prefixes = filter_prefix_bindings(lo_prefixes)
+                export_prefixes = collect_export_prefixes(entry.source_path)
+                graph_prefixes = reconcile_graph_prefix_bindings(
+                    export_prefixes, primary_prefix, primary_ns
+                )
 
-                for prefix_name, ns_uri in lo_prefixes.items():
+                for prefix_name, ns_uri in graph_prefixes.items():
                     merged.bind(prefix_name, Namespace(ns_uri))
                     prefix_bindings[prefix_name] = ns_uri
 
                 for triple in lo_graph:
                     merged.add(triple)
+                declare_prefixes = sparql_declare_prefix_bindings(
+                    graph_prefixes,
+                    export_prefixes,
+                    lo_graph,
+                )
                 inject_lo_sparql_prefixes(
                     merged,
                     lo_ontology_uri(entry.binding.ontology_id),
-                    lo_prefixes,
+                    declare_prefixes,
                 )
 
                 for _ in lo_graph.subjects(
