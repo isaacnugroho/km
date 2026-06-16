@@ -246,6 +246,24 @@ class QuadStoreWrapper:
         self.store.remove(quad)
         return True
 
+    def remove_quads_for_subject(self, graph_uri: str, subject: NamedNode) -> int:
+        graph = NamedNode(graph_uri)
+        removed = 0
+        for quad in list(self.store.quads_for_pattern(subject, None, None, graph)):
+            self.store.remove(quad)
+            removed += 1
+        return removed
+
+    def restore_graph_quads(self, graph_uri: str, snapshot: list[Quad]) -> None:
+        """Replace all quads in a named graph with a snapshot (rollback helper)."""
+        graph = NamedNode(graph_uri)
+        for quad in list(self.quads_in_graph(graph_uri)):
+            self.store.remove(quad)
+        for quad in snapshot:
+            self.store.add(
+                Quad(quad.subject, quad.predicate, quad.object, graph)
+            )
+
     def serialize_graph(self, graph_uri: str) -> str:
         quads = self.quads_in_graph(graph_uri)
         if not quads:

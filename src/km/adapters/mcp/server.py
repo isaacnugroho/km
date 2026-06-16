@@ -72,6 +72,21 @@ def ingest_case_facts(facts: str, format: str = "json-ld") -> str:
 
 
 @mcp.tool()
+def patch_case_facts(
+    diff_deletions: str = "",
+    diff_insertions: str = "",
+    format: str = "turtle",
+) -> str:
+    """Apply insert and delete diffs to correct facts in the active case branch graph."""
+    result = _run_tool(
+        lambda: tool_handlers.handle_patch_case_facts(
+            _get_app(), diff_deletions, diff_insertions, format
+        )
+    )
+    return tool_handlers.json_result(result)
+
+
+@mcp.tool()
 def validate_bindings() -> str:
     """Validate workspace learning-ontology bindings and return per-binding status."""
     result = _run_tool(lambda: tool_handlers.handle_validate_bindings(_get_app()))

@@ -15,6 +15,7 @@ from tests.fixtures_data import SAMPLE_CASE_TURTLE
 EXPECTED_TOOLS = {
     "setup",
     "ingest_case_facts",
+    "patch_case_facts",
     "validate_bindings",
     "validate_constraints",
     "propose_local_exception",

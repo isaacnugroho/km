@@ -20,7 +20,7 @@ Two surfaces exist. Do not pattern-match CLI names to invent MCP tools or undocu
 
 | Surface                          | Purpose                      | Allowed                                                                                                                                                                                                                                                                                                    |
 | :------------------------------- | :--------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **MCP tools** (agent KM work)    | All semantic operations      | `setup`, `status`, `validate_bindings`, `validate_constraints`, `ingest_case_facts`, `query_semantic_graph`, `propose_local_exception`, `approve_local_exception`, `propose_semantic_mr`, `approve_semantic_mr`, `reject_semantic_mr`, `sync_pending_branch_merges`, `resolve_branch_merge`, `export_case` |
+| **MCP tools** (agent KM work)    | All semantic operations      | `setup`, `status`, `validate_bindings`, `validate_constraints`, `ingest_case_facts`, `patch_case_facts`, `query_semantic_graph`, `propose_local_exception`, `approve_local_exception`, `propose_semantic_mr`, `approve_semantic_mr`, `reject_semantic_mr`, `sync_pending_branch_merges`, `resolve_branch_merge`, `export_case` |
 | **`km` CLI** (shell, human-only) | Bootstrap / inspect / export | `init`, `status`, `mcp`, `export-case` only                                                                                                                                                                                                                                                                |
 
 **Rules:**
@@ -36,6 +36,7 @@ Two surfaces exist. Do not pattern-match CLI names to invent MCP tools or undocu
 
 - Do not infer undocumented `km` subcommands (e.g. `km validate`, `km merge-resolve`).
 - Do not hand-edit `case-exports/` or `.km/case_quads.db`.
+- Do not use ad-hoc Python/bootstrap scripts to mutate the case store — use MCP **`patch_case_facts`** to correct graph facts.
 - Do not treat unit/integration test pass as a substitute for SHACL conformance.
 - Do not rewrite `.km/config.json` to "repair" MCP errors.
 
@@ -97,10 +98,11 @@ After Phase 0, before writing any code or proposing plans, align your context wi
 As you write code (e.g., creating components, modules, endpoints, or data models), you must discover and register the facts:
 1.  **Extract Semantics:** Identify concepts, types, and properties.
 2.  **Serialize as RDF:** Format the discoveries as JSON-LD or Turtle triples.
-3.  **Ingest Facts:** Invoke `ingest_case_facts` to write these facts into the active branch's Named Graph.
+3.  **Ingest Facts:** Invoke `ingest_case_facts` to write new facts into the active branch's Named Graph.
+4.  **Correct Facts:** Invoke `patch_case_facts` when previously ingested triples must be removed or replaced (`diff_deletions` / `diff_insertions`).
 
 > [!TIP]
-> Do not dump raw file contents into `ingest_case_facts`. Extract high-density structural facts such as dependency imports, event hook throttle rates, or service layer abstractions.
+> Do not dump raw file contents into `ingest_case_facts`. Extract high-density structural facts such as dependency imports, event hook throttle rates, or service layer abstractions. Use `patch_case_facts` — not hand-edited TTL — to fix stale or wrong graph facts.
 
 ### Phase 3: Constraint Verification (Before Turn End / Planning Completion)
 Before completing a task or presenting a completed change to the developer, verify system compliance against LO **canonical graphs** only (pending MR proposals are excluded):
@@ -122,6 +124,7 @@ See **§2 MCP tool errors (infrastructure)** when the tool itself fails (not a `
 | Workspace status               | `km status`      | `status`                                                           |
 | SHACL validation               | —                | `validate_constraints`                                             |
 | Fact ingestion                 | —                | `ingest_case_facts`                                                |
+| Case graph correction          | —                | `patch_case_facts`                                                 |
 | SPARQL query                   | —                | `query_semantic_graph`                                             |
 | Local exceptions               | —                | `propose_local_exception`, `approve_local_exception`               |
 | LO binding validation          | —                | `validate_bindings`                                                |
@@ -160,6 +163,51 @@ mcp_client.call_tool(
 
 Facts are written to `.km/case_quads.db` first. Exports land in `case-exports/graphs/{active-ref}.ttl` per `case_exports.export_policy` (default: before commit). Use MCP **`export_case`** or CLI **`km export-case`** when policy is `on_commit` or `manual`. **Do not** hand-edit export files.
 
+### 5.1b Case Graph Correction (`patch_case_facts`)
+
+When facts on the active branch are wrong, obsolete, or tied to a renamed/removed symbol, correct them with a bidirectional patch. The graph is updated atomically; on `status: "error"` nothing changes.
+
+| Parameter          | Purpose                                                                 |
+| :----------------- | :---------------------------------------------------------------------- |
+| `diff_deletions`   | Turtle triples to remove (exact match), or `km:deleteSubject true`      |
+| `diff_insertions`  | Turtle triples to add                                                   |
+| `format`           | `turtle` (default)                                                      |
+
+Response: `{ "status": "success", "triples_removed": int, "triples_added": int }`.
+
+```python
+mcp_client.call_tool(
+    "patch_case_facts",
+    {
+        "diff_deletions": (
+            "@prefix hex: <http://ontologies.hexagonal.org/core#> .\n"
+            "@prefix app: <http://app.local/fleet#> .\n\n"
+            "app:GameData a hex:ApplicationCore .\n"
+        ),
+        "diff_insertions": (
+            "@prefix hex: <http://ontologies.hexagonal.org/core#> .\n"
+            "@prefix app: <http://app.local/fleet#> .\n\n"
+            "app:GameData a hex:DomainEntity .\n"
+        ),
+    },
+)
+```
+
+To delete all triples for a subject (e.g. a phantom node):
+
+```python
+mcp_client.call_tool(
+    "patch_case_facts",
+    {
+        "diff_deletions": (
+            "@prefix km: <http://km.local/governance#> .\n"
+            "@prefix app: <http://app.local/fleet#> .\n\n"
+            "app:GalaxyTycoonEngine km:deleteSubject true .\n"
+        ),
+    },
+)
+```
+
 ---
 
 ### 5.2 Executing Targeted SPARQL Queries (`query_semantic_graph`)
@@ -184,9 +232,10 @@ WHERE {
 
 ### 5.3 Navigating Violations & Proposing Exceptions
 
-When `validate_constraints` flags a violation (e.g., an API route has an execution timeout that exceeds maximum global bounds), you have two choices:
+When `validate_constraints` flags a violation (e.g., an API route has an execution timeout that exceeds maximum global bounds), you have three choices:
 1.  **Refactor the Code:** Adjust the symbolic implementation to conform to the shape.
-2.  **Propose a Local Exception:** If there is a legitimate technical reason to bypass the shape, you must register a local exception.
+2.  **Patch the Case Graph:** Use `patch_case_facts` when the violation is due to stale or incorrect ingested facts.
+3.  **Propose a Local Exception:** If there is a legitimate technical reason to bypass the shape, you must register a local exception.
 
 ```mermaid
 sequenceDiagram

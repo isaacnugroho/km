@@ -62,6 +62,19 @@ def handle_ingest_case_facts(
     return app.case_ingest.ingest(facts, format, app.git_context)
 
 
+def handle_patch_case_facts(
+    app: KMApplication,
+    diff_deletions: str = "",
+    diff_insertions: str = "",
+    format: str = "turtle",
+) -> dict[str, Any]:
+    require_implemented("patch_case_facts")
+    logger.debug("patch_case_facts format=%s", format)
+    return app.case_ingest.patch(
+        diff_deletions, diff_insertions, format, app.git_context
+    )
+
+
 def handle_validate_constraints(app: KMApplication) -> dict[str, Any]:
     require_implemented("validate_constraints")
     return app.validation.validate_constraints(app.git_context)

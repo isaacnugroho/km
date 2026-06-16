@@ -30,6 +30,7 @@ KM_POLICY = f"{KM}policy"
 KM_EXCEPTIONS_COPIED = f"{KM}exceptionsCopied"
 KM_TRIPLES_IMPORTED = f"{KM}triplesImported"
 KM_RECORDED_AT = f"{KM}recordedAt"
+KM_DELETE_SUBJECT = f"{KM}deleteSubject"
 
 CASE_GOVERNANCE_GRAPH = "http://km.local/case/governance"
 

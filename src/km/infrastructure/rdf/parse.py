@@ -16,6 +16,13 @@ logger = get_logger("rdf.parse")
 SUPPORTED_FORMATS = {"json-ld", "turtle", "ttl"}
 
 
+def parse_facts_optional(facts: str, fmt: str, graph_uri: str) -> list[Quad]:
+    """Parse RDF facts; return an empty list when the payload is blank."""
+    if not facts or not facts.strip():
+        return []
+    return parse_facts(facts, fmt, graph_uri)
+
+
 def parse_facts(facts: str, fmt: str, graph_uri: str) -> list[Quad]:
     normalized = fmt.lower()
     if normalized == "ttl":

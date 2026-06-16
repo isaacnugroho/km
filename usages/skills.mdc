@@ -7,7 +7,7 @@ alwaysApply: true
 
 Reusable recipes for Knowledge Management MCP operations. Execute these during development in KM-governed workspaces.
 
-**MCP tools (agent):** `setup`, `status`, `validate_bindings`, `validate_constraints`, `ingest_case_facts`, `query_semantic_graph`, `propose_local_exception`, `approve_local_exception`, `propose_semantic_mr`, `approve_semantic_mr`, `reject_semantic_mr`, `sync_pending_branch_merges`, `resolve_branch_merge`, `export_case`.
+**MCP tools (agent):** `setup`, `status`, `validate_bindings`, `validate_constraints`, `ingest_case_facts`, `patch_case_facts`, `query_semantic_graph`, `propose_local_exception`, `approve_local_exception`, `propose_semantic_mr`, `approve_semantic_mr`, `reject_semantic_mr`, `sync_pending_branch_merges`, `resolve_branch_merge`, `export_case`.
 
 **CLI (human / no MCP):** `km init`, `km status`, `km mcp`, `km export-case` only. There is no `km validate` — use MCP **`validate_constraints`**.
 
@@ -43,6 +43,21 @@ local:useCanvasDrag a react:HighFrequencyEventHook ;
     react:filePath "src/hooks/useCanvasDrag.ts"^^xsd:string .
 ```
 
+## Skill 1b: Case Graph Correction (`patch_case_facts`)
+
+**When:** Previously ingested facts are wrong, obsolete, or duplicate a renamed symbol — e.g. wrong `rdf:type`, phantom subject URI, or facts that no longer match code.
+
+**Do not** hand-edit `case-exports/graphs/*.ttl` or run ad-hoc Python to rebuild the case store.
+
+1. **`query_semantic_graph`** — locate incorrect triples or subjects on the active branch.
+2. **`patch_case_facts`** with Turtle `diff_deletions` and/or `diff_insertions` (`format`: `turtle`).
+   - Exact quad removal: list the ground triples to delete.
+   - Subject wipe: `km:deleteSubject true` on the subject (directive only; not persisted).
+3. Confirm `triples_removed` / `triples_added`; on `status: "error"` the graph is unchanged.
+4. **`validate_constraints`** — confirm SHACL after the patch.
+
+Use **`ingest_case_facts`** for new facts; use **`patch_case_facts`** only for corrections and deletions.
+
 ## Skill 2: Continuous SHACL Linter Cycle
 
 **When:** Immediately after any code edit or file generation.
@@ -50,7 +65,7 @@ local:useCanvasDrag a react:HighFrequencyEventHook ;
 1. **`validate_constraints`**
 2. **`conforms: true`** → proceed with git staging/commits.
 3. **`conforms: false`** → read `focus_node`, `source_shape`, `message`:
-   - Fixable → correct code, re-ingest facts, return to step 1.
+   - Fixable → correct code and/or **`patch_case_facts`**, re-validate (use **`ingest_case_facts`** only for new triples).
    - Not fixable → Skill 3.
    - Tool error (not `conforms: false`) → report exact message; do not substitute shell `km …`, hand-edited TTL, or test pass for SHACL. Optional diagnostics: MCP **`status`**, MCP **`query_semantic_graph`**, human **`km export-case`**.
 

@@ -14,6 +14,7 @@ def test_all_features_enabled() -> None:
 
 def test_phase2_features_implemented() -> None:
     require_implemented("ingest_case_facts")
+    require_implemented("patch_case_facts")
     require_implemented("query_semantic_graph")
     require_implemented("resource:case/active-graph")
 

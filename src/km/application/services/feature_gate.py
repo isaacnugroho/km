@@ -10,6 +10,7 @@ FEATURES: dict[str, bool] = {
     "validate_bindings": True,
     "export_case": True,
     "ingest_case_facts": True,
+    "patch_case_facts": True,
     "validate_constraints": True,
     "propose_local_exception": True,
     "approve_local_exception": True,

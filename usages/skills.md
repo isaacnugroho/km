@@ -2,7 +2,7 @@
 
 This document defines reusable, step-by-step workspace recipes ("skills") that agents and developer daemons can execute to automate Knowledge Management operations.
 
-**MCP tools (agent):** `setup`, `status`, `validate_bindings`, `validate_constraints`, `ingest_case_facts`, `query_semantic_graph`, `propose_local_exception`, `approve_local_exception`, `propose_semantic_mr`, `approve_semantic_mr`, `reject_semantic_mr`, `sync_pending_branch_merges`, `resolve_branch_merge`, `export_case`.
+**MCP tools (agent):** `setup`, `status`, `validate_bindings`, `validate_constraints`, `ingest_case_facts`, `patch_case_facts`, `query_semantic_graph`, `propose_local_exception`, `approve_local_exception`, `propose_semantic_mr`, `approve_semantic_mr`, `reject_semantic_mr`, `sync_pending_branch_merges`, `resolve_branch_merge`, `export_case`.
 
 **CLI (human / no MCP):** `km init`, `km status`, `km mcp`, `km export-case` only. There is **no** `km validate` — use MCP **`validate_constraints`**.
 
@@ -68,6 +68,25 @@ graph TD
 
 ---
 
+## Skill 1b: Case Graph Correction (`patch_case_facts`)
+
+**Purpose:** Remove or replace incorrect Case facts without hand-editing `case-exports/` or rebuilding the store via ad-hoc scripts.
+
+**When:** Wrong `rdf:type`, phantom subject URI, obsolete triples after a rename, or graph/modeling mistakes surfaced by `validate_constraints`.
+
+### Execution Steps
+
+1.  **`query_semantic_graph`** — find the focus node and triples to change on the active branch.
+2.  **`patch_case_facts`** with Turtle `diff_deletions` and/or `diff_insertions` (`format`: `turtle`).
+    *   **Exact removal:** list ground triples in `diff_deletions`.
+    *   **Subject wipe:** `km:deleteSubject true` on the subject (patch directive only; not stored).
+3.  Confirm `triples_removed` / `triples_added`; on `status: "error"` the graph is unchanged.
+4.  **`validate_constraints`** — re-run SHACL.
+
+Use **`ingest_case_facts`** for new facts only; use **`patch_case_facts`** for corrections and deletions.
+
+---
+
 ## Skill 2: The Continuous SHACL Linter Cycle (Validation)
 
 **Purpose:** Execute continuous constraint validation after any symbolic code edit to guarantee immediate alignment with structural constraints from LO **canonical graphs** only.
@@ -81,7 +100,7 @@ graph TD
         *   `source_shape`: The SHACL constraint definition.
         *   `message`: Explanation of the rule violation.
 3.  **Auto-Correction Loop:**
-    *   Assess if the violation can be fixed by modifying the code.
+    *   Assess if the violation can be fixed by modifying the code and/or **`patch_case_facts`** (stale graph facts).
     *   If yes, execute the correction and return to Step 1.
     *   If no, proceed to **Skill 3: Local Exception Provisioning**.
 4.  **Tool error (infrastructure):** If the call fails (not a `conforms: false` result):

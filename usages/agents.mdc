@@ -13,7 +13,7 @@ Two surfaces exist. Do not pattern-match CLI names to invent MCP tools or undocu
 
 | Surface                          | Purpose                      | Allowed                                                                                                                                                                                                                                                                                                    |
 | :------------------------------- | :--------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **MCP tools** (agent KM work)    | All semantic operations      | `setup`, `status`, `validate_bindings`, `validate_constraints`, `ingest_case_facts`, `query_semantic_graph`, `propose_local_exception`, `approve_local_exception`, `propose_semantic_mr`, `approve_semantic_mr`, `reject_semantic_mr`, `sync_pending_branch_merges`, `resolve_branch_merge`, `export_case` |
+| **MCP tools** (agent KM work)    | All semantic operations      | `setup`, `status`, `validate_bindings`, `validate_constraints`, `ingest_case_facts`, `patch_case_facts`, `query_semantic_graph`, `propose_local_exception`, `approve_local_exception`, `propose_semantic_mr`, `approve_semantic_mr`, `reject_semantic_mr`, `sync_pending_branch_merges`, `resolve_branch_merge`, `export_case` |
 | **`km` CLI** (shell, human-only) | Bootstrap / inspect / export | `init`, `status`, `mcp`, `export-case` only                                                                                                                                                                                                                                                                |
 
 - Agent KM operations **MUST** use MCP tools — never shell `km …` except when the user explicitly asks (`km init`, or human diagnostics).
@@ -27,6 +27,7 @@ Two surfaces exist. Do not pattern-match CLI names to invent MCP tools or undocu
 
 - Do not infer undocumented `km` subcommands (e.g. `km validate`, `km merge-resolve`).
 - Do not hand-edit `case-exports/` or `.km/case_quads.db`.
+- Do not use ad-hoc Python/bootstrap scripts to mutate the case store — use **`patch_case_facts`** to correct graph facts.
 - Do not treat unit/integration test pass as a substitute for SHACL conformance.
 - Do not rewrite `.km/config.json` to "repair" MCP errors.
 
@@ -65,7 +66,8 @@ When creating or modifying components, modules, endpoints, or data models:
 
 1. Extract semantics (concepts, types, properties) — not raw file dumps.
 2. Serialize as Turtle or JSON-LD mapped to active LO vocabulary.
-3. **`ingest_case_facts`** — write to the active branch Named Graph.
+3. **`ingest_case_facts`** — write new facts to the active branch Named Graph.
+4. **`patch_case_facts`** — correct or remove previously ingested facts (`diff_deletions` / `diff_insertions`).
 
 Facts persist in `.km/case_quads.db`; exports land in `case-exports/graphs/{active-ref}.ttl` per `case_exports.export_policy`. Do not hand-edit export files.
 
@@ -100,13 +102,40 @@ app:PaymentController a app:RestController ;
     app:executionTimeoutMs 5000 .
 ```
 
+### `patch_case_facts`
+
+Correct the active branch graph when facts are wrong, stale, or obsolete. Use instead of hand-editing `case-exports/` TTL.
+
+- **`diff_deletions`** — Turtle triples to remove (exact match), or `km:deleteSubject true` to remove all triples for a subject.
+- **`diff_insertions`** — Turtle triples to add (same as ingest).
+- **`format`** — `turtle` (default).
+
+Confirm `triples_removed` / `triples_added` in the response; on `status: "error"` the graph is unchanged.
+
+Retype a subject (exact quad deletion + insertion):
+
+```json
+{
+  "diff_deletions": "@prefix hex: <http://ontologies.hexagonal.org/core#> .\n@prefix app: <http://app.local/fleet#> .\n\napp:GameData a hex:ApplicationCore .\n",
+  "diff_insertions": "@prefix hex: <http://ontologies.hexagonal.org/core#> .\n@prefix app: <http://app.local/fleet#> .\n\napp:GameData a hex:DomainEntity .\n"
+}
+```
+
+Delete a phantom subject (`km:deleteSubject`):
+
+```json
+{
+  "diff_deletions": "@prefix km: <http://km.local/governance#> .\n@prefix app: <http://app.local/fleet#> .\n\napp:GalaxyTycoonEngine km:deleteSubject true .\n"
+}
+```
+
 ### `query_semantic_graph`
 
 Use compact SPARQL instead of recursive directory search to locate patterns and relationships.
 
 ### Violations — fix or propose exception
 
-1. **Refactor code** to conform to the shape, re-ingest, re-validate.
+1. **Refactor code** to conform to the shape, **`patch_case_facts`** or re-ingest, re-validate.
 2. **`propose_local_exception`** when bypass is justified — then prompt developer:
    `approve km://case/active-exceptions/{exception-id}`
 3. On approval: **`approve_local_exception`**, then re-validate.
