@@ -147,3 +147,179 @@ def test_raise_on_binding_errors() -> None:
     )
     with pytest.raises(ConfigError):
         raise_on_binding_errors(resolution)
+
+
+def test_resolver_catalog_not_found_warning(lo_repo: Path, tmp_path: Path) -> None:
+    no_catalog_root = tmp_path / "lo-root-no-catalog"
+    no_catalog_root.mkdir()
+    shutil.copytree(lo_repo / "foundation", no_catalog_root / "foundation")
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    km_dir = ws / ".km"
+    km_dir.mkdir()
+    config = {
+        "workspace_id": "no-catalog",
+        "rootPath": str(no_catalog_root),
+        "learning_ontologies": [
+            {
+                "ontology_id": "foundation",
+                "source": "foundation",
+                "mode": "read_only",
+            }
+        ],
+    }
+    (km_dir / "config.json").write_text(json.dumps(config, indent=2), encoding="utf-8")
+
+    resolver = DependencyResolverService()
+    resolution = resolver.resolve(WorkspaceConfig.model_validate(config), ws)
+    assert any(w.code == "catalog_not_found" for w in resolution.warnings)
+    assert resolution.valid
+    assert resolution.effective_cache_set == ["foundation"]
+
+
+def test_resolver_invalid_catalog_json(lo_repo: Path, tmp_path: Path) -> None:
+    bad_root = tmp_path / "bad-catalog"
+    shutil.copytree(lo_repo, bad_root)
+    (bad_root / "catalog.json").write_text("{broken", encoding="utf-8")
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    km_dir = ws / ".km"
+    km_dir.mkdir()
+    config = {
+        "workspace_id": "bad-catalog",
+        "rootPath": str(bad_root),
+        "learning_ontologies": [
+            {"ontology_id": "extension", "source": "extension", "mode": "read_only"}
+        ],
+    }
+    (km_dir / "config.json").write_text(json.dumps(config, indent=2), encoding="utf-8")
+
+    resolution = DependencyResolverService().resolve(
+        WorkspaceConfig.model_validate(config), ws
+    )
+    assert not resolution.valid
+    assert any(err.code == "catalog_invalid" for err in resolution.errors)
+
+
+def test_resolver_rootpath_required_for_dependencies(tmp_path: Path, lo_package: Path) -> None:
+    config_path = lo_package / "config.json"
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    config["dependencies"] = ["missing-parent"]
+    config_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    km_dir = ws / ".km"
+    km_dir.mkdir()
+    workspace_config = {
+        "workspace_id": "deps-without-catalog",
+        "learning_ontologies": [
+            {
+                "ontology_id": config["ontology_id"],
+                "source": str(lo_package),
+                "mode": "read_only",
+            }
+        ],
+    }
+    (km_dir / "config.json").write_text(
+        json.dumps(workspace_config, indent=2), encoding="utf-8"
+    )
+
+    resolution = DependencyResolverService().resolve(
+        WorkspaceConfig.model_validate(workspace_config), ws
+    )
+    assert not resolution.valid
+    assert any(
+        err.code == "rootPath_required_for_dependencies" for err in resolution.errors
+    )
+
+
+def test_validate_catalog_at_source(lo_repo: Path) -> None:
+    resolver = DependencyResolverService()
+    errors = resolver.validate_catalog_at_source(lo_repo / "extension")
+    assert errors == []
+
+
+def test_validate_catalog_at_source_without_catalog(tmp_path: Path) -> None:
+    resolver = DependencyResolverService()
+    assert resolver.validate_catalog_at_source(tmp_path) == []
+
+
+def test_resolver_absolute_source_outside_lo_root_warning(
+    lo_repo: Path, tmp_path: Path
+) -> None:
+    outside = tmp_path / "external-lo"
+    shutil.copytree(lo_repo / "extension", outside)
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    km_dir = ws / ".km"
+    km_dir.mkdir()
+    config = {
+        "workspace_id": "outside-source",
+        "rootPath": str(lo_repo),
+        "learning_ontologies": [
+            {
+                "ontology_id": "extension",
+                "source": str(outside),
+                "mode": "read_only",
+            }
+        ],
+    }
+    (km_dir / "config.json").write_text(json.dumps(config, indent=2), encoding="utf-8")
+
+    resolution = DependencyResolverService().resolve(
+        WorkspaceConfig.model_validate(config), ws
+    )
+    assert any(w.code == "source_outside_lo_root" for w in resolution.warnings)
+
+
+def test_resolver_catalog_validation_errors_block_resolve(
+    lo_repo: Path, tmp_path: Path
+) -> None:
+    bad_root = tmp_path / "bad-graph"
+    shutil.copytree(lo_repo, bad_root)
+    (bad_root / "middleware" / "config.json").write_text("{", encoding="utf-8")
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    km_dir = ws / ".km"
+    km_dir.mkdir()
+    config = {
+        "workspace_id": "bad-graph",
+        "rootPath": str(bad_root),
+        "learning_ontologies": [
+            {"ontology_id": "extension", "source": "extension", "mode": "read_only"}
+        ],
+    }
+    (km_dir / "config.json").write_text(json.dumps(config, indent=2), encoding="utf-8")
+
+    resolution = DependencyResolverService().resolve(
+        WorkspaceConfig.model_validate(config), ws
+    )
+    assert not resolution.valid
+    assert resolution.errors
+
+
+def test_binding_resolution_report_dict(lo_repo: Path, tmp_path: Path) -> None:
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    km_dir = ws / ".km"
+    km_dir.mkdir()
+    config = {
+        "workspace_id": "report",
+        "rootPath": str(lo_repo),
+        "learning_ontologies": [
+            {"ontology_id": "extension", "source": "extension", "mode": "read_only"}
+        ],
+    }
+    (km_dir / "config.json").write_text(json.dumps(config, indent=2), encoding="utf-8")
+    resolution = DependencyResolverService().resolve(
+        WorkspaceConfig.model_validate(config), ws, check_cache_sync=True
+    )
+    report = resolution.to_report_dict()
+    assert report["catalog_loaded"] is True
+    assert report["explicit_bindings"] == ["extension"]
+    assert "implicit_dependencies" in report
