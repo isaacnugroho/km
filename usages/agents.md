@@ -18,10 +18,10 @@ Every structural change you make to the symbolic layer must be reflected, verifi
 
 Two surfaces exist. Do not pattern-match CLI names to invent MCP tools or undocumented shell commands.
 
-| Surface                          | Purpose                      | Allowed                                                                                                                                                                                                                                                                                                    |
-| :------------------------------- | :--------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Surface                          | Purpose                      | Allowed                                                                                                                                                                                                                                                                                                                        |
+| :------------------------------- | :--------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **MCP tools** (agent KM work)    | All semantic operations      | `setup`, `status`, `validate_bindings`, `validate_constraints`, `ingest_case_facts`, `patch_case_facts`, `query_semantic_graph`, `propose_local_exception`, `approve_local_exception`, `propose_semantic_mr`, `approve_semantic_mr`, `reject_semantic_mr`, `sync_pending_branch_merges`, `resolve_branch_merge`, `export_case` |
-| **`km` CLI** (shell, human-only) | Bootstrap / inspect / export | `init`, `status`, `mcp`, `export-case` only                                                                                                                                                                                                                                                                |
+| **`km` CLI** (shell, human-only) | Bootstrap / inspect / export | `init`, `status`, `mcp`, `export-case` only                                                                                                                                                                                                                                                                                    |
 
 **Rules:**
 
@@ -167,11 +167,11 @@ Facts are written to `.km/case_quads.db` first. Exports land in `case-exports/gr
 
 When facts on the active branch are wrong, obsolete, or tied to a renamed/removed symbol, correct them with a bidirectional patch. The graph is updated atomically; on `status: "error"` nothing changes.
 
-| Parameter          | Purpose                                                                 |
-| :----------------- | :---------------------------------------------------------------------- |
-| `diff_deletions`   | Turtle triples to remove (exact match), or `km:deleteSubject true`      |
-| `diff_insertions`  | Turtle triples to add                                                   |
-| `format`           | `turtle` (default)                                                      |
+| Parameter         | Purpose                                                            |
+| :---------------- | :----------------------------------------------------------------- |
+| `diff_deletions`  | Turtle triples to remove (exact match), or `km:deleteSubject true` |
+| `diff_insertions` | Turtle triples to add                                              |
+| `format`          | `turtle` (default)                                                 |
 
 Response: `{ "status": "success", "triples_removed": int, "triples_added": int }`.
 

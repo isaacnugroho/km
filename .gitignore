@@ -14,3 +14,4 @@ htmlcov/
 .cursor/
 usages/**/lo_quads.db
 issue-speciments/
+.cm/
