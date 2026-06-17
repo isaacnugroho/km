@@ -1,0 +1,14 @@
+{
+  "ontology_id": "foundation",
+  "base_uri": "http://example.org/foundation",
+  "prefix": "found",
+  "dependencies": [],
+  "quad_store": {
+    "engine": "sqlite-quad",
+    "storage_path": "./lo_quads.db"
+  },
+  "named_graphs": {
+    "canonical": "http://km.local/learning-ontologies/foundation/canonical",
+    "governance": "http://km.local/learning-ontologies/foundation/governance"
+  }
+}

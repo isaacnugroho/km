@@ -1,0 +1,20 @@
+{
+  "catalog_version": "1",
+  "ontologies": [
+    {
+      "ontology_id": "foundation",
+      "path": "foundation",
+      "label": "Foundation LO"
+    },
+    {
+      "ontology_id": "middleware",
+      "path": "middleware",
+      "label": "Middleware LO"
+    },
+    {
+      "ontology_id": "extension",
+      "path": "extension",
+      "label": "Extension LO"
+    }
+  ]
+}

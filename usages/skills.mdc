@@ -88,7 +88,7 @@ Approved exceptions are branch-scoped; `auto_merge_exception` policy copies them
 
 **When:** Task start, after developer edits `.km/config.json`, or when `status` shows missing/stale LO bindings.
 
-1. **`validate_bindings`** — returns `{ valid, bindings[], errors[] }` per ontology.
+1. **`validate_bindings`** — returns Addendum 2 report: `{ valid, rootPath, catalog_loaded, explicit_bindings, effective_cache_set, implicit_dependencies, bindings[], errors[] }` with `binding_kind` per binding.
 2. If `valid: false`, report `errors[]` and pause (do not hand-edit config).
 3. **Not** a substitute for **`validate_constraints`** (SHACL).
 

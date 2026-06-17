@@ -1,0 +1,14 @@
+{
+  "ontology_id": "middleware",
+  "base_uri": "http://example.org/middleware",
+  "prefix": "mid",
+  "dependencies": ["foundation"],
+  "quad_store": {
+    "engine": "sqlite-quad",
+    "storage_path": "./lo_quads.db"
+  },
+  "named_graphs": {
+    "canonical": "http://km.local/learning-ontologies/middleware/canonical",
+    "governance": "http://km.local/learning-ontologies/middleware/governance"
+  }
+}

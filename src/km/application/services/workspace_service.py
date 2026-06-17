@@ -8,8 +8,12 @@ from pathlib import Path
 
 from typing import Any
 
-from km.exceptions import KmError, WorkspaceNotFoundError
-from km.infrastructure.config.loader import load_workspace_config, validate_lo_binding
+from km.application.services.dependency_resolver_service import (
+    BindingResolution,
+    DependencyResolverService,
+)
+from km.exceptions import ConfigError, KmError, WorkspaceNotFoundError
+from km.infrastructure.config.loader import load_workspace_config
 from km.infrastructure.config.models import LOBinding, LOPackageConfig
 from km.application.services.case_export_service import ensure_case_exports_dirs
 from km.infrastructure.paths import resolve_path
@@ -36,22 +40,47 @@ def discover_workspace_root(start: Path | None = None) -> Path:
     )
 
 
+def raise_on_binding_errors(resolution: BindingResolution) -> None:
+    """Map hard dependency resolution failures to ConfigError."""
+    if resolution.errors:
+        messages = resolution.hard_error_messages()
+        if messages:
+            raise ConfigError("; ".join(messages))
+
+
 class WorkspaceService:
     def __init__(self, workspace_root: Path) -> None:
         self.workspace_root = workspace_root
         self.config = load_workspace_config(workspace_root)
+        self._resolver = DependencyResolverService()
+        self._resolution: BindingResolution | None = None
         self._validated_bindings: list[tuple[LOBinding, LOPackageConfig, Path]] = []
 
+    def resolve_bindings(self, *, check_cache_sync: bool = False) -> BindingResolution:
+        self._resolution = self._resolver.resolve(
+            self.config,
+            self.workspace_root,
+            check_cache_sync=check_cache_sync,
+        )
+        self._validated_bindings = [
+            entry.to_binding_tuple() for entry in self._resolution.bindings
+        ]
+        return self._resolution
+
     def validate_bindings(self) -> None:
-        self._validated_bindings.clear()
-        for binding in self.config.learning_ontologies:
-            source_path, lo_config = validate_lo_binding(binding, self.workspace_root)
-            self._validated_bindings.append((binding, lo_config, source_path))
+        resolution = self.resolve_bindings()
+        raise_on_binding_errors(resolution)
         logger.info(
-            "Validated %d LO binding(s) for workspace %s",
-            len(self._validated_bindings),
+            "Validated %d LO binding(s) (%d explicit, %d implicit) for workspace %s",
+            len(resolution.bindings),
+            len(resolution.explicit_bindings),
+            len(resolution.implicit_dependencies),
             self.config.workspace_id,
         )
+
+    @property
+    def binding_resolution(self) -> BindingResolution | None:
+        return self._resolution
 
     @property
     def validated_bindings(self) -> list[tuple[LOBinding, LOPackageConfig, Path]]:
@@ -60,37 +89,14 @@ class WorkspaceService:
         return self._validated_bindings
 
     def binding_report(self) -> dict[str, Any]:
-        """Validate all LO bindings and return a structured report (per-binding errors)."""
-        bindings: list[dict[str, Any]] = []
-        errors: list[dict[str, str]] = []
-
-        for binding in self.config.learning_ontologies:
-            try:
-                source_path, lo_config = validate_lo_binding(
-                    binding, self.workspace_root
-                )
-                bindings.append(
-                    {
-                        "ontology_id": binding.ontology_id,
-                        "source": binding.source,
-                        "mode": binding.mode.value,
-                        "source_path": str(source_path),
-                        "base_uri": lo_config.base_uri,
-                    }
-                )
-            except KmError as exc:
-                errors.append({"ontology_id": binding.ontology_id, "message": str(exc)})
-            except Exception as exc:
-                errors.append({"ontology_id": binding.ontology_id, "message": str(exc)})
-
-        if not errors:
-            self.validate_bindings()
-
-        return {
-            "valid": len(errors) == 0,
-            "bindings": bindings,
-            "errors": errors,
-        }
+        """Validate all LO bindings and return Addendum 2 structured report."""
+        resolution = self.resolve_bindings(check_cache_sync=True)
+        report = resolution.to_report_dict()
+        if not resolution.errors:
+            self._validated_bindings = [
+                entry.to_binding_tuple() for entry in resolution.bindings
+            ]
+        return report
 
     def resolve_config_path(self, relative: str) -> Path:
         return resolve_path(relative, self.workspace_root)

@@ -1,0 +1,14 @@
+{
+  "ontology_id": "extension",
+  "base_uri": "http://example.org/extension",
+  "prefix": "ext",
+  "dependencies": ["middleware"],
+  "quad_store": {
+    "engine": "sqlite-quad",
+    "storage_path": "./lo_quads.db"
+  },
+  "named_graphs": {
+    "canonical": "http://km.local/learning-ontologies/extension/canonical",
+    "governance": "http://km.local/learning-ontologies/extension/governance"
+  }
+}

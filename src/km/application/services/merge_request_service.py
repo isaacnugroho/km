@@ -36,7 +36,8 @@ from km.domain.governance import (
     STATUS_PENDING,
     STATUS_REJECTED,
 )
-from km.exceptions import KmError, PermissionError
+from km.application.services.dependency_resolver_service import DependencyResolverService
+from km.exceptions import ConfigError, KmError, PermissionError
 from km.infrastructure.config.models import LOBinding, LOPackageConfig, AccessMode
 from km.infrastructure.rdf.parse import parse_facts
 from km.infrastructure.rdf.shacl_cache import ShaclCache
@@ -286,6 +287,15 @@ class MergeRequestService:
 
             self.lo_export.regenerate_main_ttl(entry, wrapper)
             self.lo_export.upsert_governance_mr_shard(entry, mr_id, mr_subject, wrapper)
+
+        catalog_errors = DependencyResolverService().validate_catalog_at_source(
+            source_path
+        )
+        hard_errors = [err for err in catalog_errors if err.severity == "error"]
+        if hard_errors:
+            raise ConfigError(
+                "; ".join(err.message for err in hard_errors)
+            )
 
         cache_entry = self.lo_cache.resync_binding(binding, lo_config, source_path)
         self._replace_cache_entry(cache_entry)

@@ -28,9 +28,11 @@ from km.application.services.feature_gate import release
 from km.application.services.workspace_service import (
     WorkspaceService,
     discover_workspace_root,
+    raise_on_binding_errors,
 )
 from km.infrastructure.git.context import GitContext, GitContextHolder
 from km.infrastructure.rdf.shacl_cache import ShaclCache
+from km.exceptions import ConfigError, KmError
 from km.logging_config import get_logger
 
 logger = get_logger("bootstrap")
@@ -75,15 +77,35 @@ class KMApplication:
         logger.info("Starting KM bootstrap for workspace %s", root)
 
         workspace = WorkspaceService(root)
-        workspace.validate_bindings()
-        binding_data = list(workspace.validated_bindings)
+        resolution = workspace.resolve_bindings()
+        raise_on_binding_errors(resolution)
 
         lo_cache_base = workspace.resolve_config_path(
             workspace.config.lo_cache.base_path
         )
         lo_cache = LOCacheService(root, lo_cache_base)
 
-        lo_cache.sync_all(binding_data)
+        try:
+            if resolution.bindings:
+                lo_cache.sync_all(resolution.bindings)
+            else:
+                lo_cache.sync_all([])
+        except KmError as exc:
+            raise ConfigError(f"cache_sync_failed: {exc}") from exc
+
+        for entry in lo_cache.entries:
+            cached = next(
+                (
+                    resolved
+                    for resolved in resolution.bindings
+                    if resolved.ontology_id == entry.binding.ontology_id
+                ),
+                None,
+            )
+            if cached is not None:
+                cached.cache_synced = True
+
+        binding_data = list(workspace.validated_bindings)
         shacl_cache = ShaclCache.compile_from_lo_entries(lo_cache.entries)
 
         lo_source_store = LOSourceStoreService()
@@ -168,6 +190,7 @@ class KMApplication:
         return app
 
     def get_system_status(self) -> SystemStatus:
+        resolution = self.workspace.binding_resolution
         return self.status_service.get_system_status(
             self.workspace.config,
             self.git.context,
@@ -175,6 +198,7 @@ class KMApplication:
             self.exceptions,
             self.merge_requests,
             self.merge_prompts,
+            binding_resolution=resolution,
         )
 
     def shutdown(self) -> None:

@@ -6,7 +6,14 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from km.infrastructure.config.models import LOBinding, LOPackageConfig, SyncManifest
+from km.application.services.dependency_resolver_service import ResolvedLOBinding
+from km.infrastructure.config.models import (
+    AccessMode,
+    BindingKind,
+    LOBinding,
+    LOPackageConfig,
+    SyncManifest,
+)
 from km.infrastructure.sync_manifest import lo_sync_manifest_path, workspace_km_dir
 from km.infrastructure.rdf.store import (
     QuadStoreWrapper,
@@ -31,6 +38,8 @@ class LOCacheEntry:
     manifest_path: Path
     manifest: SyncManifest | None
     rebuilt: bool
+    binding_kind: BindingKind = BindingKind.EXPLICIT
+    dependencies: list[str] | None = None
 
 
 class LOCacheService:
@@ -40,7 +49,13 @@ class LOCacheService:
         self.entries: list[LOCacheEntry] = []
 
     def sync_binding(
-        self, binding: LOBinding, lo_config: LOPackageConfig, source_path: Path
+        self,
+        binding: LOBinding,
+        lo_config: LOPackageConfig,
+        source_path: Path,
+        *,
+        binding_kind: BindingKind = BindingKind.EXPLICIT,
+        dependencies: list[str] | None = None,
     ) -> LOCacheEntry:
         cache_dir = self.lo_cache_base / binding.ontology_id
         cache_db = cache_dir / "lo_quads.db"
@@ -81,6 +96,8 @@ class LOCacheService:
             manifest_path=manifest_path,
             manifest=manifest,
             rebuilt=rebuild,
+            binding_kind=binding_kind,
+            dependencies=dependencies,
         )
         self.entries.append(entry)
         return entry
@@ -101,11 +118,23 @@ class LOCacheService:
             wrapper.close()
 
     def sync_all(
-        self, bindings: list[tuple[LOBinding, LOPackageConfig, Path]]
+        self,
+        bindings: list[ResolvedLOBinding | tuple[LOBinding, LOPackageConfig, Path]],
     ) -> list[LOCacheEntry]:
         self.entries.clear()
-        for binding, lo_config, source_path in bindings:
-            self.sync_binding(binding, lo_config, source_path)
+        for item in bindings:
+            if isinstance(item, ResolvedLOBinding):
+                binding, lo_config, source_path = item.to_binding_tuple()
+                self.sync_binding(
+                    binding,
+                    lo_config,
+                    source_path,
+                    binding_kind=item.binding_kind,
+                    dependencies=item.dependencies,
+                )
+            else:
+                binding, lo_config, source_path = item
+                self.sync_binding(binding, lo_config, source_path)
         return self.entries
 
     def resync_binding(

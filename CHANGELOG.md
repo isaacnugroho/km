@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-17
+
+### Added
+
+- Addendum 2: LO repository `catalog.json`, package `dependencies`, workspace `rootPath`, dependency graph validation (cycle detection), and transitive `effective_cache_set` LO cache sync.
+- Extended `validate_bindings` and `status` with `implicit_dependencies`, `binding_kind`, and structured dependency error codes.
+- `km://schemas/learning-ontologies` includes `binding_kind` and `dependencies` per cached LO.
+- Semantic MR approve re-validates catalog dependency graph when `{lo-root}/catalog.json` is present.
+
+### Changed
+
+- When `rootPath` and catalog are configured, binding only an extension LO auto-caches transitive prerequisites in `.km/lo-cache/`.
+- Workspaces without `rootPath` or empty `dependencies` retain pre-0.6.0 binding behavior.
+
 ## [0.5.1] - 2026-06-05
 
 ### Fixed

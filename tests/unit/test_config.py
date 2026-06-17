@@ -124,3 +124,33 @@ def test_validate_lo_binding_missing_main_ttl(
     )
     with pytest.raises(ConfigError, match="Missing canonical export"):
         validate_lo_binding(binding, tmp_workspace)
+
+
+def test_resolve_binding_source_with_rootpath(
+    tmp_path: Path, lo_package: Path
+) -> None:
+    from km.infrastructure.config.lo_root import resolve_binding_source
+
+    lo_root = lo_package.parent
+    binding = LOBinding(
+        ontology_id="hexagonal-architecture",
+        source="hexagonal-architecture",
+        mode=AccessMode.READ_ONLY,
+    )
+    resolved = resolve_binding_source(binding, tmp_path / "ws", lo_root)
+    assert resolved == lo_package.resolve()
+
+
+def test_resolve_binding_source_omitted_with_rootpath(
+    tmp_path: Path, lo_package: Path
+) -> None:
+    from km.infrastructure.config.lo_root import resolve_binding_source
+
+    lo_root = lo_package.parent
+    binding = LOBinding(
+        ontology_id="hexagonal-architecture",
+        source=None,
+        mode=AccessMode.READ_ONLY,
+    )
+    resolved = resolve_binding_source(binding, tmp_path / "ws", lo_root)
+    assert resolved == lo_package.resolve()

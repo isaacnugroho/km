@@ -1,0 +1,18 @@
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix mid:  <http://example.org/middleware#> .
+@prefix ext:  <http://example.org/extension#> .
+
+<http://example.org/extension> rdf:type owl:Ontology ;
+    rdfs:label "Extension LO" ;
+    owl:imports <http://example.org/middleware> .
+
+ext:AppConcept rdf:type owl:Class ;
+    rdfs:subClassOf mid:MiddleConcept ;
+    rdfs:label "Application Concept" .
+
+ext:AppConceptShape rdf:type sh:NodeShape ;
+    sh:targetClass ext:AppConcept ;
+    sh:class mid:MiddleConcept .

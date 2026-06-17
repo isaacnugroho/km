@@ -8,6 +8,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from km.exceptions import ConfigError
+from km.infrastructure.config.lo_root import resolve_binding_source
 from km.infrastructure.config.models import LOBinding, LOPackageConfig, WorkspaceConfig
 from km.infrastructure.paths import resolve_path
 from km.infrastructure.rdf.store import ensure_lo_governance_dir
@@ -43,9 +44,12 @@ def load_lo_package_config(source_path: Path) -> LOPackageConfig:
 
 
 def validate_lo_binding(
-    binding: LOBinding, workspace_root: Path
+    binding: LOBinding,
+    workspace_root: Path,
+    *,
+    lo_root: Path | None = None,
 ) -> tuple[Path, LOPackageConfig]:
-    source_path = resolve_path(binding.source, workspace_root)
+    source_path = resolve_binding_source(binding, workspace_root, lo_root)
     if not source_path.is_dir():
         raise ConfigError(f"LO source path does not exist: {source_path}")
 

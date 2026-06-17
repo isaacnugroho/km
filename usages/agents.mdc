@@ -56,7 +56,7 @@ Before any other MCP tool or resource:
 After Phase 0, before writing code or proposing plans:
 
 1. **`status`** — active Git branch, `branch_merge_policy`, `pending_branch_merges`, loaded LO bindings (ontology_id, source, mode, cache sync).
-2. **`validate_bindings`** (optional) — when LO bindings look stale or misconfigured; per-binding errors without hand-editing config.
+2. **`validate_bindings`** (optional) — when LO bindings look stale or misconfigured; returns Addendum 2 fields including `effective_cache_set`, `implicit_dependencies`, and structured dependency error codes.
 3. **`km://schemas/learning-ontologies`** — available classes, properties, constraint boundaries (canonical graphs only).
 4. **`km://case/active-graph`** or **`query_semantic_graph`** — existing branch facts.
 

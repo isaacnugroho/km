@@ -155,7 +155,7 @@ sequenceDiagram
 
 **When:** Task start, after developer edits `.km/config.json`, or when `status` shows missing/stale LO bindings.
 
-1. **`validate_bindings`** — returns `{ valid, bindings[], errors[] }` per ontology.
+1. **`validate_bindings`** — returns `{ valid, rootPath, catalog_loaded, explicit_bindings, effective_cache_set, implicit_dependencies, bindings[], errors[] }`. Each binding includes `binding_kind` (`explicit` | `implicit`), `dependencies`, and `cache_synced`. Use when `rootPath` and LO package `dependencies` are configured (Addendum 2).
 2. If `valid: false`, report `errors[]` and pause (do not hand-edit config).
 3. **Not** a substitute for **`validate_constraints`** (SHACL).
 

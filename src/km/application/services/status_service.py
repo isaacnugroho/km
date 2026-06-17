@@ -1,4 +1,4 @@
-"""System status aggregation (spec §4.1 #7)."""
+"""System status aggregation (spec §4.1 #7, Addendum 2 §B.5.4)."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from km.infrastructure.git.context import GitContext
 from km.logging_config import get_logger
 
 if TYPE_CHECKING:
+    from km.application.services.dependency_resolver_service import BindingResolution
     from km.application.services.exception_service import ExceptionService
     from km.application.services.merge_prompt_store import MergePromptStore
     from km.application.services.merge_request_service import MergeRequestService
@@ -28,9 +29,15 @@ class SystemStatus:
     branch_merge_policy: str
     pending_branch_merges_count: int
     pending_branch_merges: list[dict[str, Any]] = field(default_factory=list)
+    lo_root: str | None = None
+    catalog_ontology_count: int | None = None
+    explicit_bindings: list[str] = field(default_factory=list)
+    effective_cache_set: list[str] = field(default_factory=list)
+    implicit_dependencies: list[str] = field(default_factory=list)
+    dependency_validation: dict[str, bool] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload = {
             "active_branch": self.active_branch,
             "learning_ontologies": self.learning_ontologies,
             "pending_exceptions_count": self.pending_exceptions_count,
@@ -39,6 +46,18 @@ class SystemStatus:
             "pending_branch_merges_count": self.pending_branch_merges_count,
             "pending_branch_merges": self.pending_branch_merges,
         }
+        if self.lo_root is not None or self.explicit_bindings:
+            payload.update(
+                {
+                    "lo_root": self.lo_root,
+                    "catalog_ontology_count": self.catalog_ontology_count,
+                    "explicit_bindings": self.explicit_bindings,
+                    "effective_cache_set": self.effective_cache_set,
+                    "implicit_dependencies": self.implicit_dependencies,
+                    "dependency_validation": self.dependency_validation,
+                }
+            )
+        return payload
 
 
 class StatusService:
@@ -50,20 +69,23 @@ class StatusService:
         exception_service: ExceptionService | None = None,
         merge_request_service: MergeRequestService | None = None,
         merge_prompt_store: MergePromptStore | None = None,
+        binding_resolution: BindingResolution | None = None,
     ) -> SystemStatus:
         lo_status: list[dict[str, Any]] = []
         for entry in cache_entries:
-            lo_status.append(
-                {
-                    "ontology_id": entry.binding.ontology_id,
-                    "source": str(entry.source_path),
-                    "mode": entry.binding.mode.value,
-                    "cache_path": str(entry.cache_dir),
-                    "cache_synced_at": entry.manifest.synced_at
-                    if entry.manifest
-                    else None,
-                }
-            )
+            item: dict[str, Any] = {
+                "ontology_id": entry.binding.ontology_id,
+                "source": str(entry.source_path),
+                "mode": entry.binding.mode.value,
+                "cache_path": str(entry.cache_dir),
+                "cache_synced_at": entry.manifest.synced_at
+                if entry.manifest
+                else None,
+                "binding_kind": entry.binding_kind.value,
+            }
+            if entry.dependencies is not None:
+                item["dependencies"] = entry.dependencies
+            lo_status.append(item)
 
         pending_exceptions = 0
         if exception_service is not None:
@@ -80,6 +102,29 @@ class StatusService:
                 for prompt in merge_prompt_store.list_pending()
             ]
 
+        lo_root: str | None = None
+        catalog_count: int | None = None
+        explicit_bindings: list[str] = []
+        effective_cache_set: list[str] = []
+        implicit_dependencies: list[str] = []
+        dependency_validation: dict[str, bool] = {}
+
+        if binding_resolution is not None:
+            lo_root = (
+                str(binding_resolution.lo_root)
+                if binding_resolution.lo_root
+                else None
+            )
+            if binding_resolution.catalog is not None:
+                catalog_count = len(binding_resolution.catalog.ontologies)
+            explicit_bindings = list(binding_resolution.explicit_bindings)
+            effective_cache_set = list(binding_resolution.effective_cache_set)
+            implicit_dependencies = list(binding_resolution.implicit_dependencies)
+            dependency_validation = {
+                "valid": binding_resolution.valid,
+                "cache_sync_complete": binding_resolution.cache_sync_complete,
+            }
+
         status = SystemStatus(
             active_branch=git_context.branch_path,
             learning_ontologies=lo_status,
@@ -88,6 +133,12 @@ class StatusService:
             branch_merge_policy=config.branch_merge.policy.value,
             pending_branch_merges_count=len(pending_merges),
             pending_branch_merges=pending_merges,
+            lo_root=lo_root,
+            catalog_ontology_count=catalog_count,
+            explicit_bindings=explicit_bindings,
+            effective_cache_set=effective_cache_set,
+            implicit_dependencies=implicit_dependencies,
+            dependency_validation=dependency_validation,
         )
         logger.info(
             "System status: branch=%s, ontologies=%d, pending_exceptions=%d, "

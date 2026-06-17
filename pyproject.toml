@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "km"
-version = "0.5.2"
+version = "0.6.0"
 description = "Knowledge Management MCP — neuro-symbolic bridge for agent knowledge"
 readme = "README.md"
 license = { text = "MIT" }

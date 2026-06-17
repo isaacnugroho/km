@@ -1,0 +1,18 @@
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix found: <http://example.org/foundation#> .
+
+<http://example.org/foundation> rdf:type owl:Ontology ;
+    rdfs:label "Foundation LO" .
+
+found:BaseConcept rdf:type owl:Class ;
+    rdfs:label "Base Concept" .
+
+found:BaseConceptShape rdf:type sh:NodeShape ;
+    sh:targetClass found:BaseConcept ;
+    sh:property [
+        sh:path rdfs:label ;
+        sh:minCount 1 ;
+    ] .
